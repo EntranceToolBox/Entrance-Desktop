@@ -1,0 +1,65 @@
+{
+  "name": "entrance-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Electron shell locked to the local Entrance service.",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron .",
+    "pack": "electron-builder --dir --publish never",
+    "dist": "electron-builder --publish never",
+    "dist:linux": "electron-builder --linux --publish never",
+    "dist:win": "electron-builder --win --publish never",
+    "dist:mac": "electron-builder --mac --publish never"
+  },
+  "devDependencies": {
+    "electron": "^28.3.3",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.entrance.desktop",
+    "productName": "Entrance Desktop",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "package.json"
+    ],
+    "asarUnpack": [
+      "**/*.node"
+    ],
+    "extraResources": [
+      {
+        "from": "../Entrance",
+        "to": "Entrance",
+        "filter": [
+          "**/*",
+          "!**/.git/**",
+          "!**/.github/**",
+          "!**/userdata/**",
+          "!**/uploads/**",
+          "!**/*.log"
+        ]
+      }
+    ],
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "category": "Utility"
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ]
+    },
+    "mac": {
+      "target": [
+        "dmg"
+      ]
+    }
+  }
+}
