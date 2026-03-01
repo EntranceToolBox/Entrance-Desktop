@@ -13,6 +13,51 @@ let retryTimer = null;
 let backendProcess = null;
 let quitting = false;
 
+function appendEnableFeatures(features) {
+  const existing = app.commandLine.getSwitchValue('enable-features');
+  const merged = new Set(
+    String(existing || '')
+      .split(',')
+      .concat(features)
+      .map((item) => item.trim())
+      .filter(Boolean)
+  );
+  app.commandLine.appendSwitch('enable-features', Array.from(merged).join(','));
+}
+
+if (process.platform === 'linux') {
+  const requestedHint = String(
+    process.env.ENTRANCE_OZONE_PLATFORM_HINT ||
+      process.env.ELECTRON_OZONE_PLATFORM_HINT ||
+      'auto'
+  )
+    .trim()
+    .toLowerCase();
+
+  const inWaylandSession =
+    Boolean(process.env.WAYLAND_DISPLAY) ||
+    String(process.env.XDG_SESSION_TYPE || '')
+      .trim()
+      .toLowerCase() === 'wayland';
+
+  const effectiveHint =
+    requestedHint === 'auto' ? (inWaylandSession ? 'wayland' : 'x11') : requestedHint;
+
+  if (effectiveHint === 'wayland') {
+    appendEnableFeatures(['UseOzonePlatform', 'WaylandWindowDecorations']);
+    app.commandLine.appendSwitch('ozone-platform', 'wayland');
+    app.commandLine.appendSwitch('ozone-platform-hint', 'wayland');
+    process.env.ELECTRON_OZONE_PLATFORM_HINT = 'wayland';
+  } else if (effectiveHint === 'x11') {
+    app.commandLine.appendSwitch('ozone-platform', 'x11');
+    app.commandLine.appendSwitch('ozone-platform-hint', 'x11');
+    process.env.ELECTRON_OZONE_PLATFORM_HINT = 'x11';
+  } else {
+    app.commandLine.appendSwitch('ozone-platform-hint', requestedHint);
+    process.env.ELECTRON_OZONE_PLATFORM_HINT = requestedHint;
+  }
+}
+
 function isAllowedNavigation(url) {
   try {
     return new URL(url).origin === ENTRANCE_ORIGIN;

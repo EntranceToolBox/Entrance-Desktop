@@ -10,8 +10,8 @@
   },
   "main": "main.js",
   "scripts": {
-    "start": "electron .",
-    "dev": "electron .",
+    "start": "node launch-electron.js",
+    "dev": "node launch-electron.js",
     "pack": "electron-builder --dir --publish never",
     "dist": "electron-builder --publish never",
     "dist:linux": "electron-builder --linux AppImage deb rpm --publish never",
@@ -60,7 +60,8 @@
       "category": "Utility",
       "desktop": {
         "Name": "Entrance Desktop",
-        "StartupWMClass": "Entrance Desktop"
+        "StartupWMClass": "Entrance Desktop",
+        "Exec": "env ELECTRON_OZONE_PLATFORM_HINT=auto entrance-desktop %U"
       }
     },
     "win": {

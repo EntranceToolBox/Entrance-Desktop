@@ -36,6 +36,10 @@ Optional:
 - Use `ENTRANCE_URL` to point to another local URL.
   - Example: `ENTRANCE_URL=http://127.0.0.1:3000 npm start`
 - Use `ENTRANCE_AUTOSTART=0` to disable backend auto-start.
+- Linux auto-detects display backend:
+  - Wayland session (`WAYLAND_DISPLAY` or `XDG_SESSION_TYPE=wayland`) uses `ozone-platform=wayland`.
+  - Otherwise it falls back to `ozone-platform=x11`.
+  - Override via `ENTRANCE_OZONE_PLATFORM_HINT` (e.g. `x11`, `wayland`, `auto`).
 
 ## Package
 
