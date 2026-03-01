@@ -34,10 +34,9 @@ npm run dist
 # platform specific
 npm run dist:linux
 npm run dist:win
-npm run dist:mac
 ```
 
 Artifacts are generated in `Desktop/dist/`.
 
-For real cross-platform artifacts (Linux + Windows + macOS), use the workflow:
+For CI artifacts (Linux AppImage/deb/rpm + Windows NSIS), use the workflow:
 `.github/workflows/build-desktop.yml`.

@@ -8,7 +8,6 @@
     "pack": "npm run pack --prefix Desktop",
     "dist": "npm run dist --prefix Desktop",
     "dist:linux": "npm run dist:linux --prefix Desktop",
-    "dist:win": "npm run dist:win --prefix Desktop",
-    "dist:mac": "npm run dist:mac --prefix Desktop"
+    "dist:win": "npm run dist:win --prefix Desktop"
   }
 }
