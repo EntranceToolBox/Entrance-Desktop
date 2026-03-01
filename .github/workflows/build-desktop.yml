@@ -53,9 +53,21 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y rpm
+          sudo apt-get install -y rpm ruby ruby-dev build-essential
+          sudo gem install --no-document fpm
+          fpm --version
 
-      - name: Build desktop package
+      - name: Build desktop package (Linux)
+        if: runner.os == 'Linux'
+        working-directory: Desktop
+        run: npm run ${{ matrix.build_script }}
+        env:
+          USE_SYSTEM_FPM: "true"
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build desktop package (non-Linux)
+        if: runner.os != 'Linux'
         working-directory: Desktop
         run: npm run ${{ matrix.build_script }}
         env:

@@ -1,0 +1,11 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Entrance Desktop
+Comment=Desktop wrapper for Entrance local service
+Exec=entrance-desktop %U
+TryExec=entrance-desktop
+Icon=entrance-desktop
+Terminal=false
+Categories=Utility;
+StartupNotify=true

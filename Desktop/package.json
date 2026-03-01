@@ -3,6 +3,11 @@
   "version": "0.1.0",
   "private": true,
   "description": "Electron shell locked to the local Entrance service.",
+  "homepage": "https://github.com/EntranceToolBox/Entrance-Desktop",
+  "author": {
+    "name": "fcanlnony",
+    "email": "fcanlnony@outlook.com"
+  },
   "main": "main.js",
   "scripts": {
     "start": "electron .",
@@ -49,7 +54,14 @@
         "deb",
         "rpm"
       ],
-      "category": "Utility"
+      "executableName": "entrance-desktop",
+      "icon": "../Share/Linux/entrance-desktop.png",
+      "maintainer": "fcanlnony <fcanlnony@outlook.com>",
+      "category": "Utility",
+      "desktop": {
+        "Name": "Entrance Desktop",
+        "StartupWMClass": "Entrance Desktop"
+      }
     },
     "win": {
       "target": [
