@@ -8,6 +8,10 @@
     "name": "fcanlnony",
     "email": "fcanlnony@outlook.com"
   },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/EntranceToolBox/Entrance-Desktop.git"
+  },
   "main": "main.js",
   "scripts": {
     "start": "node launch-electron.js",

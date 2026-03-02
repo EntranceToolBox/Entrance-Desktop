@@ -11,6 +11,14 @@ on:
 jobs:
   build-asar:
     runs-on: ubuntu-latest
+    env:
+      ELECTRON_CACHE: ${{ runner.temp }}/electron-cache
+      ELECTRON_BUILDER_CACHE: ${{ runner.temp }}/electron-builder-cache
+      ELECTRON_MIRROR: https://npmmirror.com/mirrors/electron/
+      npm_config_fetch_retries: "5"
+      npm_config_fetch_retry_factor: "2"
+      npm_config_fetch_retry_mintimeout: "20000"
+      npm_config_fetch_retry_maxtimeout: "120000"
 
     steps:
       - name: Checkout
@@ -29,11 +37,11 @@ jobs:
 
       - name: Install backend dependencies
         working-directory: Entrance
-        run: npm ci
+        run: npm ci --no-audit --no-fund
 
       - name: Install desktop dependencies
         working-directory: Desktop
-        run: npm ci
+        run: npm ci --no-audit --no-fund
 
       - name: Build unpacked app
         working-directory: Desktop
