@@ -2,9 +2,11 @@ name: Build ASAR
 
 on:
   workflow_dispatch:
+  schedule:
+    - cron: "0 2 * * *"
   push:
-    tags:
-      - "v*"
+    branches:
+      - "**"
 
 jobs:
   build-asar:
