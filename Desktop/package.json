@@ -14,7 +14,7 @@
     "dev": "node launch-electron.js",
     "pack": "electron-builder --dir --publish never",
     "dist": "electron-builder --publish never",
-    "dist:linux": "electron-builder --linux AppImage deb rpm --publish never",
+    "dist:linux": "electron-builder --linux AppImage --publish never",
     "dist:win": "electron-builder --win nsis --publish never"
   },
   "devDependencies": {
@@ -50,9 +50,7 @@
     ],
     "linux": {
       "target": [
-        "AppImage",
-        "deb",
-        "rpm"
+        "AppImage"
       ],
       "executableName": "entrance-desktop",
       "icon": "../Share/Linux/entrance-desktop.png",
@@ -60,10 +58,15 @@
       "category": "Utility",
       "desktop": {
         "Name": "Entrance Desktop",
-        "StartupWMClass": "Entrance Desktop",
-        "Exec": "env ELECTRON_OZONE_PLATFORM_HINT=auto entrance-desktop %U"
+        "StartupWMClass": "Entrance Desktop"
       }
     },
+    "appImage": {
+      "executableArgs": [
+        "--no-sandbox"
+      ]
+    },
+    "afterPack": "./scripts/after-pack.js",
     "win": {
       "target": [
         "nsis"

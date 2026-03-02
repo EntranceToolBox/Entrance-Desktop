@@ -2,22 +2,13 @@ const { spawn } = require('child_process');
 const path = require('path');
 
 function computeLinuxOzoneHint(env) {
-  const requested = String(
+  const hint = String(
     env.ENTRANCE_OZONE_PLATFORM_HINT || env.ELECTRON_OZONE_PLATFORM_HINT || 'auto'
   )
     .trim()
     .toLowerCase();
 
-  if (requested !== 'auto') {
-    return requested;
-  }
-
-  const sessionType = String(env.XDG_SESSION_TYPE || '').trim().toLowerCase();
-  if (env.WAYLAND_DISPLAY || sessionType === 'wayland') {
-    return 'wayland';
-  }
-
-  return 'x11';
+  return hint || 'auto';
 }
 
 const electronBinary = require('electron');

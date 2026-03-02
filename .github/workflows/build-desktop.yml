@@ -18,8 +18,8 @@ jobs:
             artifact_name: Entrance-Desktop-linux
             artifact_paths: |
               Desktop/dist/*.AppImage
-              Desktop/dist/*.deb
-              Desktop/dist/*.rpm
+              # Desktop/dist/*.deb
+              # Desktop/dist/*.rpm
           - os: windows-latest
             build_script: dist:win
             artifact_name: Entrance-Desktop-windows
@@ -49,20 +49,11 @@ jobs:
         working-directory: Desktop
         run: npm ci
 
-      - name: Install Linux packaging dependencies
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y rpm ruby ruby-dev build-essential
-          sudo gem install --no-document fpm
-          fpm --version
-
       - name: Build desktop package (Linux)
         if: runner.os == 'Linux'
         working-directory: Desktop
         run: npm run ${{ matrix.build_script }}
         env:
-          USE_SYSTEM_FPM: "true"
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
