@@ -40,3 +40,5 @@ Artifacts are generated in `Desktop/dist/`.
 
 For CI artifacts (Linux AppImage/deb/rpm + Windows NSIS), use the workflow:
 `.github/workflows/build-desktop.yml`.
+
+感谢测试: [makabaka2240](https://github.com/makabaka2240) 
