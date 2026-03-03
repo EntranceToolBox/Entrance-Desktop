@@ -74,7 +74,9 @@
     "win": {
       "target": [
         "nsis"
-      ]
+      ],
+      "icon": "../Share/Windows/entrance-desktop.ico",
+      "signAndEditExecutable": false
     }
   }
 }

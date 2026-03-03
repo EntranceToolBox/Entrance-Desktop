@@ -93,18 +93,63 @@ function configureSerialPermissions() {
   }
 
   const isBluetoothMacLike = (name) => /^[0-9A-F]{2}(?::[0-9A-F]{2}){5}$/i.test(String(name || ''));
-  const normalizePortName = (name) => String(name || '').replace(/^\/dev\//, '');
+  const normalizePortName = (name) => String(name || '')
+    .replace(/^\/dev\//, '')
+    .replace(/^\\\\.\\/, '');
+  const normalizePortForMatch = (name) => {
+    const normalized = normalizePortName(name);
+    if (process.platform === 'win32') {
+      return normalized.toUpperCase();
+    }
+    return normalized;
+  };
   const isLinuxSerialName = (name) => {
     const text = String(name || '');
     return /^\/dev\/tty[A-Za-z0-9._-]+$/.test(text) || /^tty[A-Za-z0-9._-]+$/.test(text);
   };
-  const preferredPrefixOrder = ['ttyUSB', 'ttyACM', 'ttyAMA', 'ttyTHS', 'ttyS'];
+  const isWindowsSerialName = (name) => {
+    const text = String(name || '');
+    return /^(?:\\\\.\\)?COM\d+$/i.test(text) || /^COM\d+$/i.test(text);
+  };
+  const isDarwinSerialName = (name) => {
+    const text = String(name || '');
+    return /^\/dev\/(cu|tty)\.[A-Za-z0-9._-]+$/.test(text) || /^(cu|tty)\.[A-Za-z0-9._-]+$/.test(text);
+  };
+  const isSerialName = (name) => {
+    if (process.platform === 'win32') {
+      return isWindowsSerialName(name);
+    }
+    if (process.platform === 'darwin') {
+      return isDarwinSerialName(name);
+    }
+    return isLinuxSerialName(name);
+  };
+  const preferredPrefixOrder = process.platform === 'win32'
+    ? ['COM']
+    : process.platform === 'darwin'
+      ? ['cu.', 'tty.']
+      : ['ttyUSB', 'ttyACM', 'ttyAMA', 'ttyTHS', 'ttyS'];
+
+  const parseWindowsComIndex = (name) => {
+    const match = /^COM(\d+)$/i.exec(normalizePortName(name));
+    if (!match) {
+      return null;
+    }
+    return Number.parseInt(match[1], 10);
+  };
 
   const sortSerialPorts = (ports) => {
     const copy = [...ports];
     copy.sort((a, b) => {
       const aName = normalizePortName(a.portName);
       const bName = normalizePortName(b.portName);
+      if (process.platform === 'win32') {
+        const aNum = parseWindowsComIndex(aName);
+        const bNum = parseWindowsComIndex(bName);
+        if (aNum != null && bNum != null && aNum !== bNum) {
+          return aNum - bNum;
+        }
+      }
       const aIdx = preferredPrefixOrder.findIndex((prefix) => aName.startsWith(prefix));
       const bIdx = preferredPrefixOrder.findIndex((prefix) => bName.startsWith(prefix));
       const aScore = aIdx === -1 ? preferredPrefixOrder.length : aIdx;
@@ -119,7 +164,7 @@ function configureSerialPermissions() {
 
   const findPreferredPortId = (portList) => {
     const preferredPort = String(process.env.ENTRANCE_SERIAL_PORT || '').trim();
-    const preferredNormalized = normalizePortName(preferredPort);
+    const preferredNormalized = normalizePortForMatch(preferredPort);
     if (!preferredNormalized) {
       return '';
     }
@@ -128,7 +173,7 @@ function configureSerialPermissions() {
       const portName = String(port && port.portName);
       return (
         portName === preferredPort ||
-        normalizePortName(portName) === preferredNormalized
+        normalizePortForMatch(portName) === preferredNormalized
       );
     });
     if (preferredMatch) {
@@ -139,9 +184,16 @@ function configureSerialPermissions() {
   };
 
   const getRealPorts = (portList) => {
+    if (process.platform === 'win32') {
+      return portList.filter((port) => Boolean(port && (port.portName || port.portId)));
+    }
     return portList.filter((port) => {
       const portName = String(port && port.portName);
-      return Boolean(portName) && isLinuxSerialName(portName) && !isBluetoothMacLike(portName);
+      const portId = String(port && port.portId);
+      if (!portName) {
+        return Boolean(portId);
+      }
+      return isSerialName(portName) && !isBluetoothMacLike(portName);
     });
   };
 
@@ -420,7 +472,10 @@ function configureSerialPermissions() {
     const preferredPortId = findPreferredPortId(portList);
     const realPorts = getRealPorts(portList);
     // Serial auto-select is enabled by default; set ENTRANCE_SERIAL_AUTO_SELECT=0 to force picker UI.
-    const autoSelectEnv = String(process.env.ENTRANCE_SERIAL_AUTO_SELECT || '1')
+    const autoSelectDefault = process.platform === 'win32' ? '0' : '1';
+    const autoSelectEnv = String(
+      process.env.ENTRANCE_SERIAL_AUTO_SELECT ?? autoSelectDefault
+    )
       .trim()
       .toLowerCase();
     const autoSelectEnabled = !['0', 'false', 'off', 'no'].includes(autoSelectEnv);
