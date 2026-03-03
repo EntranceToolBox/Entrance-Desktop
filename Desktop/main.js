@@ -96,13 +96,6 @@ function configureSerialPermissions() {
   const normalizePortName = (name) => String(name || '')
     .replace(/^\/dev\//, '')
     .replace(/^\\\\.\\/, '');
-  const normalizePortForMatch = (name) => {
-    const normalized = normalizePortName(name);
-    if (process.platform === 'win32') {
-      return normalized.toUpperCase();
-    }
-    return normalized;
-  };
   const isLinuxSerialName = (name) => {
     const text = String(name || '');
     return /^\/dev\/tty[A-Za-z0-9._-]+$/.test(text) || /^tty[A-Za-z0-9._-]+$/.test(text);
@@ -162,27 +155,6 @@ function configureSerialPermissions() {
     return copy;
   };
 
-  const findPreferredPortId = (portList) => {
-    const preferredPort = String(process.env.ENTRANCE_SERIAL_PORT || '').trim();
-    const preferredNormalized = normalizePortForMatch(preferredPort);
-    if (!preferredNormalized) {
-      return '';
-    }
-
-    const preferredMatch = portList.find((port) => {
-      const portName = String(port && port.portName);
-      return (
-        portName === preferredPort ||
-        normalizePortForMatch(portName) === preferredNormalized
-      );
-    });
-    if (preferredMatch) {
-      return preferredMatch.portId;
-    }
-
-    return '';
-  };
-
   const getRealPorts = (portList) => {
     if (process.platform === 'win32') {
       return portList.filter((port) => Boolean(port && (port.portName || port.portId)));
@@ -195,21 +167,6 @@ function configureSerialPermissions() {
       }
       return isSerialName(portName) && !isBluetoothMacLike(portName);
     });
-  };
-
-  const selectSerialPortId = (portList) => {
-    const preferredPortId = findPreferredPortId(portList);
-    if (preferredPortId) {
-      return preferredPortId;
-    }
-
-    const realPorts = sortSerialPorts(getRealPorts(portList));
-
-    if (realPorts.length > 0) {
-      return realPorts[0].portId;
-    }
-
-    return '';
   };
 
   const escapeHtml = (value) => {
@@ -469,27 +426,20 @@ function configureSerialPermissions() {
       callback(String(portId || ''));
     };
 
-    const preferredPortId = findPreferredPortId(portList);
-    const realPorts = getRealPorts(portList);
-    // Serial auto-select is enabled by default; set ENTRANCE_SERIAL_AUTO_SELECT=0 to force picker UI.
-    const autoSelectDefault = process.platform === 'win32' ? '0' : '1';
-    const autoSelectEnv = String(
-      process.env.ENTRANCE_SERIAL_AUTO_SELECT ?? autoSelectDefault
-    )
-      .trim()
-      .toLowerCase();
-    const autoSelectEnabled = !['0', 'false', 'off', 'no'].includes(autoSelectEnv);
-
-    const shouldAutoSelect =
-      Boolean(preferredPortId) ||
-      (autoSelectEnabled && realPorts.length > 0) ||
-      (!autoSelectEnabled && realPorts.length === 1);
-
     void (async () => {
-      const mode = shouldAutoSelect ? 'auto' : 'picker';
-      const selectedPortId = shouldAutoSelect
-        ? (preferredPortId || selectSerialPortId(portList))
-        : await showSerialPortPicker(sortSerialPorts(realPorts), webContents);
+      const realPorts = sortSerialPorts(getRealPorts(portList));
+      if (realPorts.length === 0) {
+        if (SERIAL_DEBUG) {
+          const currentUrl = webContents && !webContents.isDestroyed()
+            ? webContents.getURL()
+            : '<destroyed>';
+          const portNames = portList.map((port) => port.portName || port.portId).join(', ');
+          console.log(`[serial] select-serial-port url=${currentUrl} ports=[${portNames}] mode=picker selected=<none>`);
+        }
+        finalize('');
+        return;
+      }
+      const selectedPortId = await showSerialPortPicker(realPorts, webContents);
 
       if (SERIAL_DEBUG) {
         const currentUrl = webContents && !webContents.isDestroyed()
@@ -500,7 +450,7 @@ function configureSerialPermissions() {
         const selectedName = selectedPort ? (selectedPort.portName || selectedPort.portId) : '<none>';
         console.log(
           `[serial] select-serial-port url=${currentUrl} ` +
-          `ports=[${portNames}] mode=${mode} selected=${selectedName}`
+          `ports=[${portNames}] mode=picker selected=${selectedName}`
         );
       }
 
