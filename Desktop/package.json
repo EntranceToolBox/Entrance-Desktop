@@ -1,6 +1,6 @@
 {
   "name": "entrance-desktop",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "Electron shell locked to the local Entrance service.",
   "homepage": "https://github.com/EntranceToolBox/Entrance-Desktop",
