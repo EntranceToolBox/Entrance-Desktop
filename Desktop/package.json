@@ -19,7 +19,7 @@
     "pack": "electron-builder --dir --publish never",
     "dist": "electron-builder --publish never",
     "dist:linux": "electron-builder --linux AppImage --publish never",
-    "dist:win": "electron-builder --win nsis --publish never"
+    "dist:win": "electron-builder --win zip --publish never"
   },
   "devDependencies": {
     "electron": "^28.3.3",
@@ -73,7 +73,7 @@
     "afterPack": "./scripts/after-pack.js",
     "win": {
       "target": [
-        "nsis"
+        "zip"
       ],
       "icon": "../Share/Windows/entrance-desktop.ico",
       "signAndEditExecutable": false

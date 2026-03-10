@@ -34,7 +34,7 @@ jobs:
             build_script: dist:win
             artifact_name: Entrance-Desktop-windows
             artifact_paths: |
-              Desktop/dist/*.exe
+              Desktop/dist/*.zip
 
     steps:
       - name: Checkout

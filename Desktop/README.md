@@ -57,5 +57,7 @@ npm run dist:win
 npm run dist:mac
 ```
 
+The Windows package target defaults to a portable `zip` archive rather than an installer.
+
 To build all platforms in one go, run GitHub Actions workflow:
 `.github/workflows/build-desktop.yml`.
