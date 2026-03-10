@@ -46,6 +46,10 @@
           "**/*",
           "!**/.git/**",
           "!**/.github/**",
+          "!**/users.json",
+          "!**/known_hosts.json",
+          "!**/private-networks.json",
+          "!**/.ssh_password_key",
           "!**/userdata/**",
           "!**/uploads/**",
           "!**/*.log"
