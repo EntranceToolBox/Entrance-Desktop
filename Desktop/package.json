@@ -18,6 +18,7 @@
     "dev": "node launch-electron.js",
     "pack": "electron-builder --dir --publish never",
     "dist": "electron-builder --publish never",
+    "dist:darwin": "electron-builder --mac zip --publish never",
     "dist:linux": "electron-builder --linux AppImage --publish never",
     "dist:win": "electron-builder --win zip --publish never"
   },
@@ -48,8 +49,16 @@
         "to": "Entrance",
         "filter": [
           "**/*",
+          "!.git",
           "!**/.git/**",
+          "!.gitignore",
+          "!.dockerignore",
           "!**/.github/**",
+          "!README.md",
+          "!AGENTS.md",
+          "!CLAUDE.md",
+          "!Dockerfile",
+          "!compose.yml",
           "!**/users.json",
           "!**/known_hosts.json",
           "!**/private-networks.json",
@@ -72,6 +81,13 @@
         "Name": "Entrance Desktop",
         "StartupWMClass": "Entrance Desktop"
       }
+    },
+    "mac": {
+      "target": [
+        "zip"
+      ],
+      "icon": "../Share/MacOS/entrance-desktop.png",
+      "category": "public.app-category.utilities"
     },
     "appImage": {
       "executableArgs": [
