@@ -9,6 +9,7 @@ const DESKTOP_HOMEPAGE = 'https://github.com/EntranceToolBox/Entrance-Desktop';
 const RETRY_INTERVAL_MS = 2000;
 const STARTUP_PROGRESS_BOOT_DELAY_MS = 180;
 const STARTUP_PROGRESS_TRANSITION_MS = 520;
+const STARTUP_WINDOW_BACKGROUND = '#0e131b';
 const DEFAULT_AUTH_SECRET = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
 const DEFAULT_SSH_PASSWORD_KEY = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
 const SERIAL_DEBUG = process.env.ENTRANCE_DEBUG_SERIAL === '1';
@@ -877,6 +878,8 @@ async function showWaitingPage(win) {
           radial-gradient(circle at top, rgba(45, 140, 255, 0.18), transparent 36%),
           linear-gradient(160deg, var(--bg-1), var(--bg-2));
         color: var(--text);
+        opacity: 1;
+        transition: opacity ${STARTUP_PROGRESS_TRANSITION_MS}ms ease;
       }
       body::before {
         content: "";
@@ -886,6 +889,8 @@ async function showWaitingPage(win) {
           radial-gradient(circle at 20% 20%, rgba(124, 199, 255, 0.12), transparent 28%),
           radial-gradient(circle at 80% 78%, rgba(45, 140, 255, 0.12), transparent 22%);
         pointer-events: none;
+        opacity: 1;
+        transition: opacity ${STARTUP_PROGRESS_TRANSITION_MS}ms ease;
       }
       .card {
         width: min(360px, calc(100vw - 48px));
@@ -900,8 +905,15 @@ async function showWaitingPage(win) {
         opacity: 1;
         transition: transform ${STARTUP_PROGRESS_TRANSITION_MS}ms ease, opacity ${STARTUP_PROGRESS_TRANSITION_MS}ms ease;
       }
+      body[data-state="complete"] {
+        opacity: 0;
+      }
+      body[data-state="complete"]::before {
+        opacity: 0;
+      }
       body[data-state="complete"] .card {
-        transform: translateY(-8px) scale(1.02);
+        opacity: 0;
+        transform: translateY(24px) scale(0.96);
       }
       .logo-wrap {
         width: 132px;
@@ -1136,11 +1148,25 @@ async function openEntrance(win) {
 }
 
 function createMainWindow() {
+  const titleBarOptions = process.platform === 'darwin'
+    ? {}
+    : {
+        titleBarStyle: 'hidden',
+        titleBarOverlay: {
+          color: STARTUP_WINDOW_BACKGROUND,
+          symbolColor: '#f5f8ff',
+          height: 32
+        }
+      };
+
   const win = new BrowserWindow({
     width: 1280,
     height: 800,
     minWidth: 1024,
     minHeight: 680,
+    backgroundColor: STARTUP_WINDOW_BACKGROUND,
+    show: false,
+    ...titleBarOptions,
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
@@ -1150,6 +1176,11 @@ function createMainWindow() {
   });
 
   lockToEntrance(win);
+  win.once('ready-to-show', () => {
+    if (!win.isDestroyed()) {
+      win.show();
+    }
+  });
 
   win.webContents.on('did-fail-load', (_event, _code, _desc, validatedURL, isMainFrame) => {
     void (async () => {
