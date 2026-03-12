@@ -646,6 +646,7 @@ function getBackendEnv() {
     PORT: process.env.PORT || port,
     AUTH_SECRET: process.env.AUTH_SECRET || DEFAULT_AUTH_SECRET,
     SSH_PASSWORD_KEY: process.env.SSH_PASSWORD_KEY || DEFAULT_SSH_PASSWORD_KEY,
+    ENTRANCE_DESKTOP_NOLOGIN: process.env.ENTRANCE_DESKTOP_NOLOGIN || '1',
     ENTRANCE_DATA_DIR: dataDir
   };
 }
