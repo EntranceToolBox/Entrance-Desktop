@@ -7,6 +7,8 @@ const ENTRANCE_URL = process.env.ENTRANCE_URL || 'http://localhost:3000';
 const ENTRANCE_ORIGIN = new URL(ENTRANCE_URL).origin;
 const DESKTOP_HOMEPAGE = 'https://github.com/EntranceToolBox/Entrance-Desktop';
 const RETRY_INTERVAL_MS = 2000;
+const STARTUP_PROGRESS_BOOT_DELAY_MS = 180;
+const STARTUP_PROGRESS_TRANSITION_MS = 520;
 const DEFAULT_AUTH_SECRET = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
 const DEFAULT_SSH_PASSWORD_KEY = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
 const SERIAL_DEBUG = process.env.ENTRANCE_DEBUG_SERIAL === '1';
@@ -14,6 +16,7 @@ const SERIAL_DEBUG = process.env.ENTRANCE_DEBUG_SERIAL === '1';
 let retryTimer = null;
 let backendProcess = null;
 let quitting = false;
+let waitingPageLogoDataUrl = null;
 
 function appendEnableFeatures(features) {
   const existing = app.commandLine.getSwitchValue('enable-features');
@@ -70,6 +73,41 @@ function openDesktopHomepage() {
       console.warn(`Failed to open desktop homepage: ${error.message}`);
     }
   });
+}
+
+function wait(ms) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+function getShareDirectory() {
+  if (app.isPackaged) {
+    return path.join(process.resourcesPath, 'Share');
+  }
+  return path.resolve(__dirname, '..', 'Share');
+}
+
+function getStartupLogoPath() {
+  return path.join(getShareDirectory(), 'Logo.png');
+}
+
+function getStartupLogoDataUrl() {
+  if (waitingPageLogoDataUrl !== null) {
+    return waitingPageLogoDataUrl;
+  }
+
+  try {
+    const buffer = fs.readFileSync(getStartupLogoPath());
+    waitingPageLogoDataUrl = `data:image/png;base64,${buffer.toString('base64')}`;
+  } catch (error) {
+    waitingPageLogoDataUrl = '';
+    if (!quitting) {
+      console.warn(`Failed to load startup logo: ${error.message}`);
+    }
+  }
+
+  return waitingPageLogoDataUrl;
 }
 
 async function showAboutDialog(browserWindow) {
@@ -777,40 +815,197 @@ async function safeLoadURL(win, url) {
   }
 }
 
+async function setWaitingPageState(win, state) {
+  if (!isWindowUsable(win)) {
+    return false;
+  }
+
+  try {
+    return await win.webContents.executeJavaScript(
+      `(() => {
+        const controller = window.__entranceDesktopStartup;
+        if (!controller || typeof controller.setState !== 'function') {
+          return false;
+        }
+        controller.setState(${JSON.stringify(state)});
+        return true;
+      })();`,
+      true
+    );
+  } catch {
+    return false;
+  }
+}
+
+async function loadEntranceWithStartupTransition(win) {
+  const waitingPageVisible = await setWaitingPageState(win, 'complete');
+  if (waitingPageVisible) {
+    await wait(STARTUP_PROGRESS_TRANSITION_MS);
+  }
+
+  return safeLoadURL(win, ENTRANCE_URL);
+}
+
 async function showWaitingPage(win) {
+  const logoSrc = getStartupLogoDataUrl();
   const html = `<!doctype html>
 <html>
   <head>
     <meta charset="UTF-8" />
     <title>Entrance Desktop</title>
     <style>
-      :root { color-scheme: light dark; }
+      :root {
+        color-scheme: dark;
+        --bg-1: #0e131b;
+        --bg-2: #131c28;
+        --panel: rgba(14, 19, 27, 0.74);
+        --border: rgba(130, 156, 194, 0.18);
+        --text: #f5f8ff;
+        --text-muted: rgba(245, 248, 255, 0.68);
+        --track: rgba(255, 255, 255, 0.12);
+        --fill-start: #7cc7ff;
+        --fill-end: #2d8cff;
+      }
       body {
         margin: 0;
         font-family: "Noto Sans", "Segoe UI", sans-serif;
         display: grid;
         place-items: center;
         min-height: 100vh;
+        overflow: hidden;
+        background:
+          radial-gradient(circle at top, rgba(45, 140, 255, 0.18), transparent 36%),
+          linear-gradient(160deg, var(--bg-1), var(--bg-2));
+        color: var(--text);
+      }
+      body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        background:
+          radial-gradient(circle at 20% 20%, rgba(124, 199, 255, 0.12), transparent 28%),
+          radial-gradient(circle at 80% 78%, rgba(45, 140, 255, 0.12), transparent 22%);
+        pointer-events: none;
       }
       .card {
-        padding: 24px 28px;
-        border-radius: 12px;
-        border: 1px solid rgba(128, 128, 128, 0.4);
-        max-width: 520px;
+        width: min(360px, calc(100vw - 48px));
+        padding: 36px 28px 28px;
+        border-radius: 24px;
+        border: 1px solid var(--border);
+        background: var(--panel);
+        backdrop-filter: blur(22px);
+        box-shadow: 0 28px 80px rgba(0, 0, 0, 0.34);
+        text-align: center;
+        transform: translateY(0) scale(1);
+        opacity: 1;
+        transition: transform ${STARTUP_PROGRESS_TRANSITION_MS}ms ease, opacity ${STARTUP_PROGRESS_TRANSITION_MS}ms ease;
       }
-      h1 { margin: 0 0 10px; font-size: 22px; }
-      p { margin: 0; line-height: 1.5; opacity: 0.88; }
-      code { font-size: 0.95em; }
+      body[data-state="complete"] .card {
+        transform: translateY(-8px) scale(1.02);
+      }
+      .logo-wrap {
+        width: 132px;
+        height: 132px;
+        margin: 0 auto 20px;
+        display: grid;
+        place-items: center;
+        border-radius: 28px;
+        background: rgba(255, 255, 255, 0.06);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+      }
+      .logo {
+        width: 96px;
+        height: 96px;
+        object-fit: contain;
+        filter: drop-shadow(0 8px 14px rgba(0, 0, 0, 0.18));
+      }
+      .title {
+        margin: 0;
+        font-size: 28px;
+        font-weight: 700;
+        letter-spacing: 0.02em;
+      }
+      .status {
+        margin: 10px 0 18px;
+        font-size: 16px;
+        color: var(--text-muted);
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+      }
+      .progress {
+        position: relative;
+        height: 10px;
+        border-radius: 999px;
+        overflow: hidden;
+        background: var(--track);
+      }
+      .progress-fill {
+        position: relative;
+        height: 100%;
+        width: 0%;
+        border-radius: inherit;
+        background: linear-gradient(90deg, var(--fill-start), var(--fill-end));
+        box-shadow: 0 0 18px rgba(45, 140, 255, 0.4);
+        transition: width ${STARTUP_PROGRESS_TRANSITION_MS}ms cubic-bezier(.22,.61,.36,1);
+      }
+      .progress-fill::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.46), transparent);
+        transform: translateX(-100%);
+        animation: shine 1.8s ease-in-out infinite;
+      }
+      .hint {
+        margin: 14px 0 0;
+        font-size: 13px;
+        color: var(--text-muted);
+      }
+      @keyframes shine {
+        0% { transform: translateX(-100%); }
+        100% { transform: translateX(220%); }
+      }
     </style>
   </head>
-  <body>
+  <body data-state="idle">
     <div class="card">
-      <h1>Waiting For Entrance</h1>
-      <p>
-        Cannot reach <code>${ENTRANCE_URL}</code>.
-        Desktop is auto-starting backend service and will reconnect automatically.
-      </p>
+      <div class="logo-wrap">
+        <img class="logo" src="${logoSrc}" alt="Entrance Desktop logo" />
+      </div>
+      <h1 class="title">Entrance</h1>
+      <p class="status">Starting...</p>
+      <div class="progress" aria-hidden="true">
+        <div class="progress-fill" id="progressFill"></div>
+      </div>
+      <p class="hint">Waiting for the local Entrance service to become ready</p>
     </div>
+    <script>
+      (() => {
+        const fill = document.getElementById('progressFill');
+        const states = {
+          idle: '0%',
+          starting: '50%',
+          complete: '100%'
+        };
+
+        const setState = (state) => {
+          if (!states[state]) {
+            return;
+          }
+          document.body.dataset.state = state;
+          fill.style.width = states[state];
+        };
+
+        window.__entranceDesktopStartup = { setState };
+
+        requestAnimationFrame(() => {
+          window.setTimeout(() => {
+            setState('starting');
+          }, ${STARTUP_PROGRESS_BOOT_DELAY_MS});
+        });
+      })();
+    </script>
   </body>
 </html>`;
 
@@ -852,7 +1047,7 @@ function startRetryLoop(win) {
         stopRetryLoop();
 
         try {
-          const loaded = await safeLoadURL(win, ENTRANCE_URL);
+          const loaded = await loadEntranceWithStartupTransition(win);
           if (loaded) {
             return;
           }
@@ -918,7 +1113,7 @@ async function openEntrance(win) {
     const reachable = await isEntranceReachable();
     if (reachable) {
       try {
-        const loaded = await safeLoadURL(win, ENTRANCE_URL);
+        const loaded = await loadEntranceWithStartupTransition(win);
         if (loaded) {
           return;
         }

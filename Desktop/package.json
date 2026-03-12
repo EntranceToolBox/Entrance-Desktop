@@ -40,6 +40,10 @@
     ],
     "extraResources": [
       {
+        "from": "../Share/Logo.png",
+        "to": "Share/Logo.png"
+      },
+      {
         "from": "../Entrance",
         "to": "Entrance",
         "filter": [
