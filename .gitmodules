@@ -1,3 +1,4 @@
 [submodule "Entrance"]
 	path = Entrance
 	url = https://github.com/fcanlnony/Entrance
+	branch = main
