@@ -1,5 +1,6 @@
 const { spawn } = require('child_process');
 const path = require('path');
+const { version } = require('./package.json');
 
 function computeLinuxOzoneHint(env) {
   const hint = String(
@@ -15,6 +16,10 @@ const electronBinary = require('electron');
 const appDir = path.resolve(__dirname);
 const env = { ...process.env };
 const args = [appDir];
+
+if (!env.ENTRANCE_DESKTOP_VERSION && version) {
+  env.ENTRANCE_DESKTOP_VERSION = version;
+}
 
 if (process.platform === 'linux') {
   const hint = computeLinuxOzoneHint(env);

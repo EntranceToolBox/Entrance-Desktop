@@ -1,11 +1,10 @@
-const { app, BrowserWindow, Menu, dialog, net, session, ipcMain, shell } = require('electron');
+const { app, BrowserWindow, Menu, net, session, ipcMain } = require('electron');
 const fs = require('fs');
 const path = require('path');
 const { fork } = require('child_process');
 
 const ENTRANCE_URL = process.env.ENTRANCE_URL || 'http://localhost:3000';
 const ENTRANCE_ORIGIN = new URL(ENTRANCE_URL).origin;
-const DESKTOP_HOMEPAGE = 'https://github.com/EntranceToolBox/Entrance-Desktop';
 const RETRY_INTERVAL_MS = 2000;
 const STARTUP_PROGRESS_BOOT_DELAY_MS = 180;
 const STARTUP_PROGRESS_TRANSITION_MS = 520;
@@ -68,14 +67,6 @@ function isAllowedNavigation(url) {
   }
 }
 
-function openDesktopHomepage() {
-  void shell.openExternal(DESKTOP_HOMEPAGE).catch((error) => {
-    if (!quitting) {
-      console.warn(`Failed to open desktop homepage: ${error.message}`);
-    }
-  });
-}
-
 function wait(ms) {
   return new Promise((resolve) => {
     setTimeout(resolve, ms);
@@ -109,83 +100,6 @@ function getStartupLogoDataUrl() {
   }
 
   return waitingPageLogoDataUrl;
-}
-
-async function showAboutDialog(browserWindow) {
-  const detail = [
-    `当前版本: ${app.getVersion()}`,
-    `项目主页: ${DESKTOP_HOMEPAGE}`,
-    '',
-    '欢迎提交issue和pr'
-  ].join('\n');
-
-  try {
-    const { response } = await dialog.showMessageBox(browserWindow, {
-      type: 'info',
-      title: 'About Entrance Desktop',
-      message: 'Entrance Desktop',
-      detail,
-      buttons: ['打开项目主页', '关闭'],
-      defaultId: 0,
-      cancelId: 1,
-      noLink: true
-    });
-
-    if (response === 0) {
-      openDesktopHomepage();
-    }
-  } catch (error) {
-    if (!quitting) {
-      console.warn(`Failed to show about dialog: ${error.message}`);
-    }
-  }
-}
-
-function buildApplicationMenu() {
-  const openAbout = () => {
-    const focusedWindow = BrowserWindow.getFocusedWindow();
-    const fallbackWindow = BrowserWindow.getAllWindows()[0] || null;
-    void showAboutDialog(focusedWindow || fallbackWindow);
-  };
-
-  const template = [];
-
-  if (process.platform === 'darwin') {
-    template.push({
-      label: app.name,
-      submenu: [
-        { label: `About ${app.name}`, click: openAbout },
-        { type: 'separator' },
-        { role: 'hide' },
-        { role: 'hideOthers' },
-        { role: 'unhide' },
-        { type: 'separator' },
-        { role: 'quit' }
-      ]
-    });
-  }
-
-  template.push({
-    label: 'About',
-    submenu: [
-      { label: 'Entrance Desktop', click: openAbout },
-      { label: '项目主页', click: openDesktopHomepage },
-      { type: 'separator' },
-      { role: 'quit', label: '退出' }
-    ]
-  });
-
-  if (process.platform !== 'darwin') {
-    template.push({
-      label: 'Window',
-      submenu: [
-        { role: 'minimize', label: '最小化' },
-        { role: 'close', label: '关闭窗口' }
-      ]
-    });
-  }
-
-  return Menu.buildFromTemplate(template);
 }
 
 function getAllowedSerialOrigins() {
@@ -1464,6 +1378,7 @@ function createMainWindow() {
     }
   });
 
+  win.removeMenu();
   lockToEntrance(win);
   win.once('ready-to-show', () => {
     if (!win.isDestroyed()) {
@@ -1510,7 +1425,7 @@ function createMainWindow() {
 }
 
 app.whenReady().then(() => {
-  Menu.setApplicationMenu(buildApplicationMenu());
+  Menu.setApplicationMenu(null);
   configureSerialPermissions();
   createMainWindow();
   startBackend();
