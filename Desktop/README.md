@@ -57,4 +57,4 @@ npm run dist:win
 npm run dist:mac
 ```
 
-The Windows package target defaults to a portable `zip` archive rather than an installer.
+The Windows package target produces a single portable `.exe` rather than an installer.

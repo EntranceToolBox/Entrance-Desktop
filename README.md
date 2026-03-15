@@ -37,5 +37,6 @@ npm run dist:win
 ```
 
 Artifacts are generated in `Desktop/dist/`.
+Windows builds now produce a single portable `.exe`.
 
 感谢测试: [makabaka2240](https://github.com/makabaka2240) 

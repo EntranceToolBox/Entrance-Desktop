@@ -20,7 +20,7 @@
     "dist": "electron-builder --publish never",
     "dist:darwin": "electron-builder --mac zip --publish never",
     "dist:linux": "electron-builder --linux AppImage --publish never",
-    "dist:win": "electron-builder --win zip --publish never"
+    "dist:win": "electron-builder --win portable --publish never"
   },
   "devDependencies": {
     "electron": "^28.3.3",
@@ -97,7 +97,7 @@
     "afterPack": "./scripts/after-pack.js",
     "win": {
       "target": [
-        "zip"
+        "portable"
       ],
       "icon": "../Share/Windows/entrance-desktop.ico",
       "signAndEditExecutable": false
