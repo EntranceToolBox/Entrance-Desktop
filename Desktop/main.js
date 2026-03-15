@@ -1,7 +1,7 @@
 const { app, BrowserWindow, Menu, dialog, net, session, ipcMain, shell } = require('electron');
 const fs = require('fs');
 const path = require('path');
-const { spawn, fork } = require('child_process');
+const { fork } = require('child_process');
 
 const ENTRANCE_URL = process.env.ENTRANCE_URL || 'http://localhost:3000';
 const ENTRANCE_ORIGIN = new URL(ENTRANCE_URL).origin;
@@ -9,7 +9,7 @@ const DESKTOP_HOMEPAGE = 'https://github.com/EntranceToolBox/Entrance-Desktop';
 const RETRY_INTERVAL_MS = 2000;
 const STARTUP_PROGRESS_BOOT_DELAY_MS = 180;
 const STARTUP_PROGRESS_TRANSITION_MS = 520;
-const STARTUP_WINDOW_BACKGROUND = '#0e131b';
+const STARTUP_WINDOW_BACKGROUND = '#eef0ec';
 const DEFAULT_AUTH_SECRET = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
 const DEFAULT_SSH_PASSWORD_KEY = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
 const SERIAL_DEBUG = process.env.ENTRANCE_DEBUG_SERIAL === '1';
@@ -732,40 +732,12 @@ function launchBackendWithFork() {
   attachBackendLogs(backendProcess, 'fork');
 }
 
-function launchBackendWithNpm() {
-  const backendDir = getBackendDirectory();
-  const npmCmd = process.platform === 'win32' ? 'npm.cmd' : 'npm';
-
-  const child = spawn(npmCmd, ['start'], {
-    cwd: backendDir,
-    env: getBackendEnv(),
-    stdio: ['ignore', 'pipe', 'pipe']
-  });
-
-  child.on('error', (err) => {
-    // Fallback for packaged environments where npm may not exist.
-    if (err && err.code === 'ENOENT') {
-      launchBackendWithFork();
-      return;
-    }
-    console.error(`Failed to start backend with npm: ${err.message}`);
-  });
-
-  backendProcess = child;
-  attachBackendLogs(backendProcess, 'npm');
-}
-
 function startBackend() {
   if (process.env.ENTRANCE_AUTOSTART === '0') {
     return;
   }
 
-  if (app.isPackaged) {
-    launchBackendWithFork();
-    return;
-  }
-
-  launchBackendWithNpm();
+  launchBackendWithFork();
 }
 
 function stopBackend() {
@@ -816,10 +788,15 @@ async function safeLoadURL(win, url) {
   }
 }
 
-async function setWaitingPageState(win, state) {
+async function setWaitingPageState(win, state, options = {}) {
   if (!isWindowUsable(win)) {
     return false;
   }
+
+  const payload = typeof state === 'string' ? { state } : state;
+  const config = {
+    waitForSettle: Boolean(options.waitForSettle)
+  };
 
   try {
     return await win.webContents.executeJavaScript(
@@ -828,8 +805,9 @@ async function setWaitingPageState(win, state) {
         if (!controller || typeof controller.setState !== 'function') {
           return false;
         }
-        controller.setState(${JSON.stringify(state)});
-        return true;
+        return Promise.resolve(
+          controller.setState(${JSON.stringify(payload)}, ${JSON.stringify(config)})
+        ).then(() => true);
       })();`,
       true
     );
@@ -839,8 +817,38 @@ async function setWaitingPageState(win, state) {
 }
 
 async function loadEntranceWithStartupTransition(win) {
-  const waitingPageVisible = await setWaitingPageState(win, 'complete');
-  if (waitingPageVisible) {
+  const renderingShown = await setWaitingPageState(win, {
+    state: 'rendering',
+    progress: 84,
+    completedSteps: 3,
+    activeStep: 3,
+    status: '正在载入控制台界面',
+    hint: '已完成 3 / 4 个启动阶段，正在加载已就绪的界面部分'
+  });
+  if (renderingShown) {
+    await wait(120);
+  }
+
+  const finishingShown = await setWaitingPageState(win, {
+    state: 'finishing',
+    progress: 100,
+    completedSteps: 4,
+    activeStep: -1,
+    status: '即将进入 Entrance',
+    hint: '启动阶段已完成，正在切换到主界面'
+  }, {
+    waitForSettle: true
+  });
+
+  const waitingPageVisible = await setWaitingPageState(win, {
+    state: 'complete',
+    progress: 100,
+    completedSteps: 4,
+    activeStep: -1,
+    status: '即将进入 Entrance',
+    hint: '启动阶段已完成，正在切换到主界面'
+  });
+  if (finishingShown && waitingPageVisible) {
     await wait(STARTUP_PROGRESS_TRANSITION_MS);
   }
 
@@ -856,16 +864,19 @@ async function showWaitingPage(win) {
     <title>Entrance Desktop</title>
     <style>
       :root {
-        color-scheme: dark;
-        --bg-1: #0e131b;
-        --bg-2: #131c28;
-        --panel: rgba(14, 19, 27, 0.74);
-        --border: rgba(130, 156, 194, 0.18);
-        --text: #f5f8ff;
-        --text-muted: rgba(245, 248, 255, 0.68);
-        --track: rgba(255, 255, 255, 0.12);
-        --fill-start: #7cc7ff;
-        --fill-end: #2d8cff;
+        color-scheme: light;
+        --bg-1: #fbfbf8;
+        --bg-2: #eceeeb;
+        --bg-3: #d8dcda;
+        --panel: rgba(255, 255, 255, 0.82);
+        --border: rgba(126, 133, 141, 0.16);
+        --text: #20242b;
+        --text-muted: rgba(32, 36, 43, 0.7);
+        --text-soft: rgba(32, 36, 43, 0.48);
+        --track: rgba(153, 160, 168, 0.2);
+        --fill-start: #636b76;
+        --fill-mid: #8b95a1;
+        --fill-end: #c4cad2;
       }
       body {
         margin: 0;
@@ -875,8 +886,9 @@ async function showWaitingPage(win) {
         min-height: 100vh;
         overflow: hidden;
         background:
-          radial-gradient(circle at top, rgba(45, 140, 255, 0.18), transparent 36%),
-          linear-gradient(160deg, var(--bg-1), var(--bg-2));
+          radial-gradient(circle at 16% 18%, rgba(255, 255, 255, 0.98), transparent 34%),
+          radial-gradient(circle at 84% 20%, rgba(228, 231, 233, 0.92), transparent 30%),
+          linear-gradient(145deg, var(--bg-1), var(--bg-2) 58%, var(--bg-3));
         color: var(--text);
         opacity: 1;
         transition: opacity ${STARTUP_PROGRESS_TRANSITION_MS}ms ease;
@@ -886,20 +898,20 @@ async function showWaitingPage(win) {
         position: fixed;
         inset: 0;
         background:
-          radial-gradient(circle at 20% 20%, rgba(124, 199, 255, 0.12), transparent 28%),
-          radial-gradient(circle at 80% 78%, rgba(45, 140, 255, 0.12), transparent 22%);
+          linear-gradient(120deg, rgba(255, 255, 255, 0.55), transparent 42%),
+          radial-gradient(circle at 78% 78%, rgba(203, 207, 211, 0.42), transparent 24%);
         pointer-events: none;
         opacity: 1;
         transition: opacity ${STARTUP_PROGRESS_TRANSITION_MS}ms ease;
       }
       .card {
-        width: min(360px, calc(100vw - 48px));
-        padding: 36px 28px 28px;
+        width: min(420px, calc(100vw - 48px));
+        padding: 36px 28px 26px;
         border-radius: 24px;
         border: 1px solid var(--border);
         background: var(--panel);
         backdrop-filter: blur(22px);
-        box-shadow: 0 28px 80px rgba(0, 0, 0, 0.34);
+        box-shadow: 0 24px 72px rgba(138, 143, 150, 0.18);
         text-align: center;
         transform: translateY(0) scale(1);
         opacity: 1;
@@ -922,15 +934,17 @@ async function showWaitingPage(win) {
         display: grid;
         place-items: center;
         border-radius: 28px;
-        background: rgba(255, 255, 255, 0.06);
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+        background: linear-gradient(145deg, rgba(255, 255, 255, 0.96), rgba(236, 238, 239, 0.72));
+        border: 1px solid rgba(137, 144, 153, 0.12);
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.94),
+          0 18px 34px rgba(173, 177, 183, 0.18);
       }
       .logo {
         width: 96px;
         height: 96px;
         object-fit: contain;
-        filter: drop-shadow(0 8px 14px rgba(0, 0, 0, 0.18));
+        filter: drop-shadow(0 8px 14px rgba(120, 126, 133, 0.16));
       }
       .title {
         margin: 0;
@@ -942,41 +956,149 @@ async function showWaitingPage(win) {
         margin: 10px 0 18px;
         font-size: 16px;
         color: var(--text-muted);
-        letter-spacing: 0.16em;
+        letter-spacing: 0.08em;
+      }
+      .progress-row {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        margin-bottom: 10px;
+      }
+      .progress-label {
+        font-size: 12px;
+        letter-spacing: 0.12em;
         text-transform: uppercase;
+        color: var(--text-soft);
+      }
+      .progress-value {
+        font-size: 14px;
+        font-variant-numeric: tabular-nums;
+        color: var(--text);
       }
       .progress {
         position: relative;
-        height: 10px;
-        border-radius: 999px;
+        height: 20px;
         overflow: hidden;
-        background: var(--track);
+        background: transparent;
+      }
+      .progress::before {
+        content: "";
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 50%;
+        height: 2px;
+        border-radius: 999px;
+        background: linear-gradient(90deg, rgba(153, 160, 168, 0.32), rgba(153, 160, 168, 0.18));
+        transform: translateY(-50%);
       }
       .progress-fill {
         position: relative;
         height: 100%;
         width: 0%;
-        border-radius: inherit;
-        background: linear-gradient(90deg, var(--fill-start), var(--fill-end));
-        box-shadow: 0 0 18px rgba(45, 140, 255, 0.4);
-        transition: width ${STARTUP_PROGRESS_TRANSITION_MS}ms cubic-bezier(.22,.61,.36,1);
+        overflow: hidden;
+        background: transparent;
+        box-shadow: none;
+        transition: width 220ms cubic-bezier(.22,.61,.36,1);
+      }
+      .progress-fill::before {
+        content: "";
+        position: absolute;
+        left: 0;
+        right: -64px;
+        top: 50%;
+        height: 16px;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 16' preserveAspectRatio='none'%3E%3Cpath d='M0 8C8 8 8 3 16 3S24 13 32 13S40 3 48 3S56 8 64 8' fill='none' stroke='%23636b76' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+        background-repeat: repeat-x;
+        background-size: 64px 16px;
+        filter: drop-shadow(0 3px 8px rgba(99, 107, 118, 0.18));
+        transform: translateY(-50%);
+        animation: waveDrift 1.3s linear infinite, waveBob 2.4s ease-in-out infinite;
       }
       .progress-fill::after {
         content: "";
         position: absolute;
-        inset: 0;
-        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.46), transparent);
-        transform: translateX(-100%);
-        animation: shine 1.8s ease-in-out infinite;
+        left: 0;
+        right: -64px;
+        top: 50%;
+        height: 16px;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 16' preserveAspectRatio='none'%3E%3Cpath d='M0 8C8 8 8 3 16 3S24 13 32 13S40 3 48 3S56 8 64 8' fill='none' stroke='%23eef0ec' stroke-opacity='0.45' stroke-width='1.1' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+        background-repeat: repeat-x;
+        background-size: 64px 16px;
+        transform: translateY(calc(-50% - 1px));
+        animation: waveDrift 1.3s linear infinite, waveBob 2.4s ease-in-out infinite;
+      }
+      .stage-list {
+        display: grid;
+        gap: 10px;
+        margin-top: 18px;
+        text-align: left;
+      }
+      .stage-item {
+        display: grid;
+        grid-template-columns: auto 1fr auto;
+        gap: 10px;
+        align-items: center;
+        padding: 10px 12px;
+        border-radius: 14px;
+        background: rgba(248, 249, 249, 0.74);
+        border: 1px solid rgba(151, 156, 163, 0.1);
+        transition:
+          transform 240ms ease,
+          background 240ms ease,
+          border-color 240ms ease,
+          box-shadow 240ms ease;
+      }
+      .stage-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 999px;
+        background: #c7ccd2;
+        box-shadow: 0 0 0 6px rgba(199, 204, 210, 0.18);
+      }
+      .stage-label {
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--text-soft);
+      }
+      .stage-meta {
+        font-size: 11px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--text-soft);
+      }
+      .stage-item.is-active {
+        background: rgba(255, 255, 255, 0.96);
+        border-color: rgba(119, 126, 136, 0.18);
+        box-shadow: 0 10px 20px rgba(151, 156, 163, 0.12);
+        transform: translateX(4px);
+      }
+      .stage-item.is-active .stage-dot {
+        background: #68707b;
+        box-shadow: 0 0 0 8px rgba(104, 112, 123, 0.12);
+      }
+      .stage-item.is-active .stage-label,
+      .stage-item.is-active .stage-meta,
+      .stage-item.is-done .stage-label,
+      .stage-item.is-done .stage-meta {
+        color: var(--text);
+      }
+      .stage-item.is-done .stage-dot {
+        background: #97a0aa;
+        box-shadow: 0 0 0 6px rgba(151, 160, 170, 0.14);
       }
       .hint {
         margin: 14px 0 0;
         font-size: 13px;
         color: var(--text-muted);
       }
-      @keyframes shine {
-        0% { transform: translateX(-100%); }
-        100% { transform: translateX(220%); }
+      @keyframes waveDrift {
+        0% { background-position: 0 0; }
+        100% { background-position: 64px 0; }
+      }
+      @keyframes waveBob {
+        0%, 100% { transform: translateY(calc(-50% - 1px)); }
+        50% { transform: translateY(calc(-50% + 1px)); }
       }
     </style>
   </head>
@@ -986,34 +1108,197 @@ async function showWaitingPage(win) {
         <img class="logo" src="${logoSrc}" alt="Entrance Desktop logo" />
       </div>
       <h1 class="title">Entrance</h1>
-      <p class="status">Starting...</p>
+      <p class="status" id="statusText">准备启动窗口</p>
+      <div class="progress-row">
+        <span class="progress-label">启动进度</span>
+        <span class="progress-value" id="progressValue">08%</span>
+      </div>
       <div class="progress" aria-hidden="true">
         <div class="progress-fill" id="progressFill"></div>
       </div>
-      <p class="hint">Waiting for the local Entrance service to become ready</p>
+      <div class="stage-list">
+        <div class="stage-item" data-step="0">
+          <span class="stage-dot"></span>
+          <span class="stage-label">桌面窗口初始化</span>
+          <span class="stage-meta">待命</span>
+        </div>
+        <div class="stage-item" data-step="1">
+          <span class="stage-dot"></span>
+          <span class="stage-label">本地服务启动</span>
+          <span class="stage-meta">待命</span>
+        </div>
+        <div class="stage-item" data-step="2">
+          <span class="stage-dot"></span>
+          <span class="stage-label">服务状态检测</span>
+          <span class="stage-meta">待命</span>
+        </div>
+        <div class="stage-item" data-step="3">
+          <span class="stage-dot"></span>
+          <span class="stage-label">控制台界面渲染</span>
+          <span class="stage-meta">待命</span>
+        </div>
+      </div>
+      <p class="hint" id="hintText">按已完成阶段实时推进启动进度</p>
     </div>
     <script>
       (() => {
         const fill = document.getElementById('progressFill');
-        const states = {
-          idle: '0%',
-          starting: '50%',
-          complete: '100%'
+        const progressValue = document.getElementById('progressValue');
+        const statusText = document.getElementById('statusText');
+        const hintText = document.getElementById('hintText');
+        const stages = Array.from(document.querySelectorAll('.stage-item'));
+        const statePresets = {
+          idle: {
+            state: 'idle',
+            progress: 8,
+            completedSteps: 0,
+            activeStep: 0,
+            status: '准备启动窗口',
+            hint: '正在初始化桌面窗口与启动视图'
+          },
+          starting: {
+            state: 'starting',
+            progress: 28,
+            completedSteps: 1,
+            activeStep: 1,
+            status: '正在启动本地服务',
+            hint: '已完成 1 / 4 个启动阶段，正在装载本地服务选项'
+          },
+          checking: {
+            state: 'checking',
+            progress: 54,
+            completedSteps: 2,
+            activeStep: 2,
+            status: '正在检测服务状态',
+            hint: '已完成 2 / 4 个启动阶段，正在实时轮询本地服务'
+          },
+          rendering: {
+            state: 'rendering',
+            progress: 84,
+            completedSteps: 3,
+            activeStep: 3,
+            status: '正在载入控制台界面',
+            hint: '已完成 3 / 4 个启动阶段，正在加载已就绪的界面部分'
+          },
+          finishing: {
+            state: 'finishing',
+            progress: 100,
+            completedSteps: 4,
+            activeStep: -1,
+            status: '即将进入 Entrance',
+            hint: '启动阶段已完成，正在切换到主界面'
+          },
+          complete: {
+            state: 'complete',
+            progress: 100,
+            completedSteps: 4,
+            activeStep: -1,
+            status: '即将进入 Entrance',
+            hint: '启动阶段已完成，正在切换到主界面'
+          }
         };
+        let current = { ...statePresets.idle };
+        let target = { ...current };
+        let rafId = 0;
+        let settleResolvers = [];
 
-        const setState = (state) => {
-          if (!states[state]) {
+        const clamp = (value) => Math.max(0, Math.min(100, Number(value) || 0));
+
+        const resolveSettled = () => {
+          if (settleResolvers.length === 0) {
             return;
           }
-          document.body.dataset.state = state;
-          fill.style.width = states[state];
+          const resolvers = settleResolvers;
+          settleResolvers = [];
+          for (const resolve of resolvers) {
+            resolve(true);
+          }
         };
 
+        const render = (model) => {
+          const percent = clamp(model.progress);
+          document.body.dataset.state = model.state || 'idle';
+          fill.style.width = String(percent) + '%';
+          progressValue.textContent = String(Math.round(percent)).padStart(2, '0') + '%';
+          statusText.textContent = model.status || '';
+          hintText.textContent = model.hint || '';
+
+          for (const [index, stage] of stages.entries()) {
+            const meta = stage.querySelector('.stage-meta');
+            const isDone = index < (model.completedSteps || 0);
+            const isActive = index === model.activeStep;
+            stage.classList.toggle('is-done', isDone);
+            stage.classList.toggle('is-active', isActive);
+            meta.textContent = isDone ? '完成' : isActive ? '进行中' : '待命';
+          }
+        };
+
+        const animate = () => {
+          const delta = clamp(target.progress) - clamp(current.progress);
+          if (Math.abs(delta) <= 0.2) {
+            current = { ...target, progress: clamp(target.progress) };
+            render(current);
+            rafId = 0;
+            resolveSettled();
+            return;
+          }
+
+          current = {
+            ...target,
+            progress: clamp(current.progress) + delta * 0.14
+          };
+          render(current);
+          rafId = window.requestAnimationFrame(animate);
+        };
+
+        const waitForSettle = () => {
+          if (!rafId) {
+            return Promise.resolve(true);
+          }
+          return new Promise((resolve) => {
+            settleResolvers.push(resolve);
+          });
+        };
+
+        const setState = (update, options = {}) => {
+          const input = typeof update === 'string' ? { state: update } : (update || {});
+          const preset = input.state && statePresets[input.state] ? statePresets[input.state] : null;
+          target = {
+            ...(preset || target),
+            ...input
+          };
+          if (typeof target.progress !== 'number') {
+            target.progress = preset ? preset.progress : current.progress;
+          }
+          if (typeof target.completedSteps !== 'number') {
+            target.completedSteps = preset ? preset.completedSteps : current.completedSteps;
+          }
+          if (typeof target.activeStep !== 'number') {
+            target.activeStep = preset ? preset.activeStep : current.activeStep;
+          }
+          if (!target.status) {
+            target.status = preset ? preset.status : current.status;
+          }
+          if (!target.hint) {
+            target.hint = preset ? preset.hint : current.hint;
+          }
+          if (!rafId) {
+            rafId = window.requestAnimationFrame(animate);
+          }
+          if (options.waitForSettle) {
+            return waitForSettle();
+          }
+          return true;
+        };
+
+        render(current);
         window.__entranceDesktopStartup = { setState };
 
         requestAnimationFrame(() => {
           window.setTimeout(() => {
-            setState('starting');
+            if (current.state === 'idle' && target.state === 'idle') {
+              setState('starting');
+            }
           }, ${STARTUP_PROGRESS_BOOT_DELAY_MS});
         });
       })();
@@ -1037,11 +1322,34 @@ function startRetryLoop(win) {
   }
 
   let inFlight = false;
+  let attemptCount = 0;
 
-  retryTimer = setInterval(() => {
+  const attemptLoad = () => {
     if (inFlight) {
       return;
     }
+
+    attemptCount += 1;
+    void setWaitingPageState(
+      win,
+      attemptCount === 1
+        ? {
+            state: 'starting',
+            progress: 28,
+            completedSteps: 1,
+            activeStep: 1,
+            status: '正在启动本地服务',
+            hint: '已完成 1 / 4 个启动阶段，正在装载本地服务选项'
+          }
+        : {
+            state: 'checking',
+            progress: Math.min(76, 46 + (attemptCount - 2) * 8),
+            completedSteps: 2,
+            activeStep: 2,
+            status: '正在检测服务状态',
+            hint: '已完成 2 / 4 个启动阶段，正在实时轮询本地服务'
+          }
+    );
 
     inFlight = true;
     void (async () => {
@@ -1055,6 +1363,15 @@ function startRetryLoop(win) {
         if (!reachable) {
           return;
         }
+
+        await setWaitingPageState(win, {
+          state: 'rendering',
+          progress: 84,
+          completedSteps: 3,
+          activeStep: 3,
+          status: '正在载入控制台界面',
+          hint: '已完成 3 / 4 个启动阶段，正在加载已就绪的界面部分'
+        });
 
         stopRetryLoop();
 
@@ -1081,7 +1398,10 @@ function startRetryLoop(win) {
         inFlight = false;
       }
     })();
-  }, RETRY_INTERVAL_MS);
+  };
+
+  attemptLoad();
+  retryTimer = setInterval(attemptLoad, RETRY_INTERVAL_MS);
 }
 
 function lockToEntrance(win) {
@@ -1116,37 +1436,6 @@ function lockToEntrance(win) {
   });
 }
 
-async function openEntrance(win) {
-  if (!isWindowUsable(win)) {
-    return;
-  }
-
-  try {
-    const reachable = await isEntranceReachable();
-    if (reachable) {
-      try {
-        const loaded = await loadEntranceWithStartupTransition(win);
-        if (loaded) {
-          return;
-        }
-      } catch (error) {
-        if (!quitting) {
-          console.warn(`Initial load failed, falling back to waiting page: ${error.message}`);
-        }
-      }
-    }
-
-    const waitingShown = await showWaitingPage(win);
-    if (waitingShown) {
-      startRetryLoop(win);
-    }
-  } catch (error) {
-    if (!quitting) {
-      console.error(`Failed to open Entrance: ${error.message}`);
-    }
-  }
-}
-
 function createMainWindow() {
   const titleBarOptions = process.platform === 'darwin'
     ? {}
@@ -1154,7 +1443,7 @@ function createMainWindow() {
         titleBarStyle: 'hidden',
         titleBarOverlay: {
           color: STARTUP_WINDOW_BACKGROUND,
-          symbolColor: '#f5f8ff',
+          symbolColor: '#20242b',
           height: 32
         }
       };
@@ -1205,15 +1494,26 @@ function createMainWindow() {
     });
   });
 
-  void openEntrance(win);
+  void showWaitingPage(win)
+    .then((waitingShown) => {
+      if (waitingShown) {
+        startRetryLoop(win);
+      }
+    })
+    .catch((error) => {
+      if (!quitting) {
+        console.error(`Failed to initialize waiting page: ${error.message}`);
+      }
+    });
+
   return win;
 }
 
 app.whenReady().then(() => {
   Menu.setApplicationMenu(buildApplicationMenu());
   configureSerialPermissions();
-  startBackend();
   createMainWindow();
+  startBackend();
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
