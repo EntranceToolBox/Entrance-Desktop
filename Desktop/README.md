@@ -36,6 +36,7 @@ Optional:
 - Use `ENTRANCE_URL` to point to another local URL.
   - Example: `ENTRANCE_URL=http://127.0.0.1:3000 npm start`
 - Use `ENTRANCE_AUTOSTART=0` to disable backend auto-start.
+- `ENTRANCE_DESKTOP_VERSION` defaults to the desktop app's `package.json.version`; set it explicitly only if you need to override that value.
 - Linux auto-detects display backend:
   - Wayland session (`WAYLAND_DISPLAY` or `XDG_SESSION_TYPE=wayland`) uses `ozone-platform=wayland`.
   - Otherwise it falls back to `ozone-platform=x11`.

@@ -2,6 +2,7 @@ const { app, BrowserWindow, Menu, net, session, ipcMain } = require('electron');
 const fs = require('fs');
 const path = require('path');
 const { fork } = require('child_process');
+const { version: DESKTOP_APP_VERSION } = require('./package.json');
 
 const ENTRANCE_URL = process.env.ENTRANCE_URL || 'http://localhost:3000';
 const ENTRANCE_ORIGIN = new URL(ENTRANCE_URL).origin;
@@ -17,6 +18,10 @@ let retryTimer = null;
 let backendProcess = null;
 let quitting = false;
 let waitingPageLogoDataUrl = null;
+
+if (!process.env.ENTRANCE_DESKTOP_VERSION && DESKTOP_APP_VERSION) {
+  process.env.ENTRANCE_DESKTOP_VERSION = DESKTOP_APP_VERSION;
+}
 
 function appendEnableFeatures(features) {
   const existing = app.commandLine.getSwitchValue('enable-features');
