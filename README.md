@@ -2,6 +2,8 @@
 
 Desktop wrapper for [Entrance](https://github.com/fcanlnony/Entrance), built with Electron.
 
+![Screenshot](doc/screenshot.png)
+
 ## Repository Layout
 
 - `Entrance/`: backend submodule (kept with original folder name)
