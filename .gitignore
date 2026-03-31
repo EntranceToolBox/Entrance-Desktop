@@ -1,0 +1,10 @@
+/.data/
+/data/
+*.log
+
+# Desktop build/dependency outputs
+/Desktop/node_modules/
+/Desktop/dist/
+
+# Common local runtime snapshots created during testing
+/Desktop/backend-data/
