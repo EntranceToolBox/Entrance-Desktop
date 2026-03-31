@@ -1,5 +1,7 @@
 # Entrance-Desktop
 
+[中文文档 / Chinese README](README_CN.md)
+
 Desktop wrapper for [Entrance](https://github.com/fcanlnony/Entrance), built with Electron.
 
 ![Screenshot](doc/screenshot.png)
