@@ -74,7 +74,7 @@
         "AppImage"
       ],
       "executableName": "entrance-desktop",
-      "icon": "../Share/Linux/entrance-desktop.png",
+      "icon": "../Share/Linux/icons",
       "maintainer": "fcanlnony <fcanlnony@outlook.com>",
       "category": "Utility",
       "desktop": {
