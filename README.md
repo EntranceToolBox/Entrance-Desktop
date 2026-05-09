@@ -29,6 +29,19 @@ npm start
 
 The Electron app auto-starts backend from `Entrance`.
 
+## Startup Model
+
+Desktop startup does not use `Entrance/start.sh`.
+
+- Development startup: `npm start` runs `Desktop/launch-electron.js`, which launches Electron with `Desktop/main.js`.
+- Linux packaged startup: the AppImage/executable starts Electron. During packaging, `Desktop/scripts/after-pack.js` creates a Linux wrapper that adds `--no-sandbox` and Wayland/X11 flags before executing the real binary.
+- macOS packaged startup: the `.app` starts Electron directly with `Desktop/main.js`.
+- Windows packaged startup: the portable `.exe` starts Electron directly with `Desktop/main.js`.
+
+The backend is started by `Desktop/main.js` with `child_process.fork()` against `Entrance/server.js`. The desktop process sets the backend environment, including `PORT`, `AUTH_SECRET`, `SSH_PASSWORD_KEY`, and `ENTRANCE_DATA_DIR`.
+
+`Entrance/start.sh` is only for running the backend submodule independently.
+
 ## Build Packages
 
 ```bash

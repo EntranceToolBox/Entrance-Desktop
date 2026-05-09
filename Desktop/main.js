@@ -1,11 +1,17 @@
-const { app, BrowserWindow, Menu, net, session, ipcMain } = require('electron');
+const { app, BrowserWindow, Menu, net, session, ipcMain, protocol } = require('electron');
+const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const { fork } = require('child_process');
 const { version: DESKTOP_APP_VERSION } = require('./package.json');
 
 const ENTRANCE_URL = process.env.ENTRANCE_URL || 'http://localhost:3000';
-const ENTRANCE_ORIGIN = new URL(ENTRANCE_URL).origin;
+const ENTRANCE_URL_OBJECT = new URL(ENTRANCE_URL);
+const ENTRANCE_ORIGIN = ENTRANCE_URL_OBJECT.origin;
+const ENTRANCE_API_BASE = ENTRANCE_URL_OBJECT.toString().replace(/\/$/, '');
+const ENTRANCE_WS_PROTOCOL = ENTRANCE_URL_OBJECT.protocol === 'https:' ? 'wss:' : 'ws:';
+const ENTRANCE_WS_BASE = `${ENTRANCE_WS_PROTOCOL}//${ENTRANCE_URL_OBJECT.host}`;
+const DEFAULT_DESKTOP_ALLOWED_ORIGIN = 'app://entrance';
 const RETRY_INTERVAL_MS = 2000;
 const STARTUP_PROGRESS_BOOT_DELAY_MS = 180;
 const STARTUP_PROGRESS_TRANSITION_MS = 520;
@@ -14,10 +20,69 @@ const DEFAULT_AUTH_SECRET = '0123456789abcdef0123456789abcdef0123456789abcdef012
 const DEFAULT_SSH_PASSWORD_KEY = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
 const SERIAL_DEBUG = process.env.ENTRANCE_DEBUG_SERIAL === '1';
 
+function parseDesktopFlag(name, fallbackValue) {
+  const rawValue = process.env[name];
+  if (rawValue === undefined || rawValue === null || String(rawValue).trim() === '') {
+    return fallbackValue;
+  }
+  return String(rawValue).trim() === '1';
+}
+
+function resolveDesktopRendererOrigin(rawOrigin) {
+  const fallbackUrl = new URL(DEFAULT_DESKTOP_ALLOWED_ORIGIN);
+  const fallback = {
+    origin: DEFAULT_DESKTOP_ALLOWED_ORIGIN,
+    scheme: fallbackUrl.protocol.slice(0, -1),
+    host: fallbackUrl.host
+  };
+  const normalized = String(rawOrigin || DEFAULT_DESKTOP_ALLOWED_ORIGIN).trim() || DEFAULT_DESKTOP_ALLOWED_ORIGIN;
+
+  try {
+    const parsed = new URL(normalized);
+    const scheme = parsed.protocol.slice(0, -1);
+    if (!scheme || !parsed.host || parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+      throw new Error('unsupported renderer origin');
+    }
+    return {
+      origin: `${scheme}://${parsed.host}`,
+      scheme,
+      host: parsed.host
+    };
+  } catch (error) {
+    console.warn(
+      `Invalid ENTRANCE_DESKTOP_ALLOWED_ORIGIN "${normalized}", falling back to ${DEFAULT_DESKTOP_ALLOWED_ORIGIN}.`
+    );
+    return fallback;
+  }
+}
+
+const DESKTOP_API_ONLY = parseDesktopFlag('ENTRANCE_DESKTOP_API_ONLY', true);
+const DESKTOP_NOLOGIN = parseDesktopFlag('ENTRANCE_DESKTOP_NOLOGIN', true);
+const DESKTOP_RENDERER = resolveDesktopRendererOrigin(process.env.ENTRANCE_DESKTOP_ALLOWED_ORIGIN);
+const DESKTOP_ALLOWED_ORIGIN = DESKTOP_RENDERER.origin;
+const EXPLICIT_BOOTSTRAP_SECRET = String(process.env.ENTRANCE_DESKTOP_BOOTSTRAP_SECRET || '').trim();
+const DESKTOP_BOOTSTRAP_SECRET = EXPLICIT_BOOTSTRAP_SECRET || crypto.randomBytes(32).toString('hex');
+const DESKTOP_AUTH_PROXY_ENABLED = DESKTOP_API_ONLY && DESKTOP_NOLOGIN;
+
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: DESKTOP_RENDERER.scheme,
+    privileges: {
+      standard: true,
+      secure: true,
+      supportFetchAPI: true,
+      stream: true,
+      corsEnabled: true
+    }
+  }
+]);
+
 let retryTimer = null;
 let backendProcess = null;
 let quitting = false;
 let waitingPageLogoDataUrl = null;
+let desktopAuthToken = '';
+let desktopBootstrapPromise = null;
 
 if (!process.env.ENTRANCE_DESKTOP_VERSION && DESKTOP_APP_VERSION) {
   process.env.ENTRANCE_DESKTOP_VERSION = DESKTOP_APP_VERSION;
@@ -64,12 +129,25 @@ if (process.platform === 'linux') {
   }
 }
 
-function isAllowedNavigation(url) {
+function isRendererUrl(url) {
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === `${DESKTOP_RENDERER.scheme}:` && parsed.host === DESKTOP_RENDERER.host;
+  } catch {
+    return false;
+  }
+}
+
+function isBackendUrl(url) {
   try {
     return new URL(url).origin === ENTRANCE_ORIGIN;
   } catch {
     return false;
   }
+}
+
+function isAllowedNavigation(url) {
+  return isRendererUrl(url) || isBackendUrl(url);
 }
 
 function wait(ms) {
@@ -107,14 +185,104 @@ function getStartupLogoDataUrl() {
   return waitingPageLogoDataUrl;
 }
 
-function getAllowedSerialOrigins() {
-  const base = new URL(ENTRANCE_URL);
-  const port = base.port ? `:${base.port}` : '';
-  const allowed = new Set([base.origin]);
+function getFrontendPublicDirectory() {
+  if (app.isPackaged) {
+    return path.join(process.resourcesPath, 'Entrance', 'public');
+  }
+  return path.resolve(__dirname, '..', 'Entrance', 'public');
+}
 
-  if (base.hostname === 'localhost') {
+function getRendererContentType(filePath) {
+  const ext = path.extname(filePath).toLowerCase();
+  const contentTypes = {
+    '.css': 'text/css; charset=UTF-8',
+    '.html': 'text/html; charset=UTF-8',
+    '.ico': 'image/x-icon',
+    '.jpeg': 'image/jpeg',
+    '.jpg': 'image/jpeg',
+    '.js': 'text/javascript; charset=UTF-8',
+    '.json': 'application/json; charset=UTF-8',
+    '.map': 'application/json; charset=UTF-8',
+    '.png': 'image/png',
+    '.svg': 'image/svg+xml',
+    '.ttf': 'font/ttf',
+    '.woff': 'font/woff',
+    '.woff2': 'font/woff2'
+  };
+
+  return contentTypes[ext] || 'application/octet-stream';
+}
+
+function resolveRendererFilePath(requestUrl) {
+  if (!isRendererUrl(requestUrl)) {
+    return null;
+  }
+
+  const publicDir = getFrontendPublicDirectory();
+  const parsed = new URL(requestUrl);
+  let pathname = decodeURIComponent(parsed.pathname || '/');
+  if (!pathname || pathname === '/') {
+    pathname = '/index.html';
+  }
+
+  const normalizedPath = path.posix.normalize(pathname);
+  const relativePath = normalizedPath.replace(/^\/+/, '');
+  if (!relativePath || relativePath.startsWith('..')) {
+    return null;
+  }
+
+  const filePath = path.join(publicDir, ...relativePath.split('/'));
+  const relativeToPublic = path.relative(publicDir, filePath);
+  if (relativeToPublic.startsWith('..') || path.isAbsolute(relativeToPublic)) {
+    return null;
+  }
+
+  return filePath;
+}
+
+async function handleRendererRequest(request) {
+  let filePath = resolveRendererFilePath(request.url);
+  if (!filePath) {
+    return new Response('Not found', { status: 404 });
+  }
+
+  try {
+    const stat = await fs.promises.stat(filePath);
+    if (stat.isDirectory()) {
+      filePath = path.join(filePath, 'index.html');
+    }
+  } catch {
+    return new Response('Not found', { status: 404 });
+  }
+
+  try {
+    const body = await fs.promises.readFile(filePath);
+    return new Response(body, {
+      status: 200,
+      headers: {
+        'cache-control': 'no-cache',
+        'content-type': getRendererContentType(filePath)
+      }
+    });
+  } catch (error) {
+    if (!quitting) {
+      console.error(`Failed to serve renderer asset: ${filePath} (${error.message})`);
+    }
+    return new Response('Internal Server Error', { status: 500 });
+  }
+}
+
+function registerRendererProtocol() {
+  protocol.handle(DESKTOP_RENDERER.scheme, handleRendererRequest);
+}
+
+function getAllowedSerialOrigins() {
+  const port = ENTRANCE_URL_OBJECT.port ? `:${ENTRANCE_URL_OBJECT.port}` : '';
+  const allowed = new Set([ENTRANCE_ORIGIN, DESKTOP_ALLOWED_ORIGIN]);
+
+  if (ENTRANCE_URL_OBJECT.hostname === 'localhost') {
     allowed.add(`http://127.0.0.1${port}`);
-  } else if (base.hostname === '127.0.0.1') {
+  } else if (ENTRANCE_URL_OBJECT.hostname === '127.0.0.1') {
     allowed.add(`http://localhost${port}`);
   }
 
@@ -122,9 +290,15 @@ function getAllowedSerialOrigins() {
 }
 
 function isAllowedSerialOrigin(url) {
+  if (url === DESKTOP_ALLOWED_ORIGIN) {
+    return true;
+  }
+
   try {
-    const origin = new URL(url).origin;
-    return getAllowedSerialOrigins().has(origin);
+    if (isRendererUrl(url)) {
+      return true;
+    }
+    return getAllowedSerialOrigins().has(new URL(url).origin);
   } catch {
     return false;
   }
@@ -572,7 +746,7 @@ function configureSerialPermissions() {
 
 function isEntranceReachable() {
   return new Promise((resolve) => {
-    const request = net.request(ENTRANCE_URL);
+    const request = net.request(new URL('/api/health', ENTRANCE_URL).toString());
     request.on('response', () => resolve(true));
     request.on('error', () => resolve(false));
     request.end();
@@ -594,8 +768,119 @@ function getBackendDataDirectory() {
   return process.env.ENTRANCE_DATA_DIR || path.join(app.getPath('userData'), 'backend-data');
 }
 
+function getRendererEntryUrl() {
+  const entryUrl = new URL('/index.html', `${DESKTOP_ALLOWED_ORIGIN}/`);
+  entryUrl.searchParams.set('apiBase', ENTRANCE_API_BASE);
+  entryUrl.searchParams.set('wsBase', ENTRANCE_WS_BASE);
+  entryUrl.searchParams.set('desktopMode', '1');
+  if (DESKTOP_AUTH_PROXY_ENABLED) {
+    entryUrl.searchParams.set('authProxy', 'header');
+  }
+  return entryUrl.toString();
+}
+
+function getDesktopBootstrapUrl() {
+  return new URL('/api/auth/desktop/bootstrap', ENTRANCE_URL).toString();
+}
+
+function getBackendAllowedHosts() {
+  const port = ENTRANCE_URL_OBJECT.port ? `:${ENTRANCE_URL_OBJECT.port}` : '';
+  const hosts = new Set([ENTRANCE_URL_OBJECT.host]);
+
+  if (ENTRANCE_URL_OBJECT.hostname === 'localhost') {
+    hosts.add(`127.0.0.1${port}`);
+  } else if (ENTRANCE_URL_OBJECT.hostname === '127.0.0.1') {
+    hosts.add(`localhost${port}`);
+  }
+
+  return hosts;
+}
+
+function shouldAttachDesktopAuth(url) {
+  if (!DESKTOP_AUTH_PROXY_ENABLED || !desktopAuthToken) {
+    return false;
+  }
+
+  try {
+    const parsed = new URL(url);
+    const protocolAllowed = parsed.protocol === ENTRANCE_URL_OBJECT.protocol || parsed.protocol === ENTRANCE_WS_PROTOCOL;
+    return protocolAllowed && getBackendAllowedHosts().has(parsed.host);
+  } catch {
+    return false;
+  }
+}
+
+async function ensureDesktopBootstrapSession() {
+  if (!DESKTOP_AUTH_PROXY_ENABLED) {
+    desktopAuthToken = '';
+    return '';
+  }
+
+  if (desktopAuthToken) {
+    return desktopAuthToken;
+  }
+
+  if (desktopBootstrapPromise) {
+    return desktopBootstrapPromise;
+  }
+
+  desktopBootstrapPromise = (async () => {
+    const response = await fetch(getDesktopBootstrapUrl(), {
+      method: 'POST',
+      headers: {
+        'X-Entrance-Desktop-Secret': DESKTOP_BOOTSTRAP_SECRET
+      }
+    });
+
+    let payload = null;
+    try {
+      payload = await response.json();
+    } catch {
+      payload = null;
+    }
+
+    if (!response.ok) {
+      const errorMessage = payload && payload.error ? payload.error : `HTTP ${response.status}`;
+      throw new Error(`Desktop bootstrap failed: ${errorMessage}`);
+    }
+
+    const token = String(payload && payload.token ? payload.token : '').trim();
+    if (!token) {
+      throw new Error('Desktop bootstrap failed: missing auth token');
+    }
+
+    desktopAuthToken = token;
+    return token;
+  })().finally(() => {
+    desktopBootstrapPromise = null;
+  });
+
+  return desktopBootstrapPromise;
+}
+
+function configureDesktopAuthProxy() {
+  const ses = session.defaultSession;
+  if (!ses) {
+    return;
+  }
+
+  ses.webRequest.onBeforeSendHeaders((details, callback) => {
+    if (!shouldAttachDesktopAuth(details.url)) {
+      callback({ requestHeaders: details.requestHeaders });
+      return;
+    }
+
+    const requestHeaders = { ...details.requestHeaders };
+    const hasAuthorization = Object.keys(requestHeaders).some((key) => key.toLowerCase() === 'authorization');
+    if (!hasAuthorization) {
+      requestHeaders.Authorization = `Bearer ${desktopAuthToken}`;
+    }
+    callback({ requestHeaders });
+  });
+}
+
 function getBackendEnv() {
-  const port = new URL(ENTRANCE_URL).port || '3000';
+  const port = ENTRANCE_URL_OBJECT.port || '3000';
   const dataDir = getBackendDataDirectory();
   fs.mkdirSync(dataDir, { recursive: true });
 
@@ -604,7 +889,10 @@ function getBackendEnv() {
     PORT: process.env.PORT || port,
     AUTH_SECRET: process.env.AUTH_SECRET || DEFAULT_AUTH_SECRET,
     SSH_PASSWORD_KEY: process.env.SSH_PASSWORD_KEY || DEFAULT_SSH_PASSWORD_KEY,
-    ENTRANCE_DESKTOP_NOLOGIN: process.env.ENTRANCE_DESKTOP_NOLOGIN || '1',
+    ENTRANCE_DESKTOP_API_ONLY: DESKTOP_API_ONLY ? '1' : '0',
+    ENTRANCE_DESKTOP_ALLOWED_ORIGIN: DESKTOP_ALLOWED_ORIGIN,
+    ENTRANCE_DESKTOP_BOOTSTRAP_SECRET: DESKTOP_BOOTSTRAP_SECRET,
+    ENTRANCE_DESKTOP_NOLOGIN: DESKTOP_NOLOGIN ? '1' : '0',
     ENTRANCE_DATA_DIR: dataDir
   };
 }
@@ -652,6 +940,9 @@ function launchBackendWithFork() {
 }
 
 function startBackend() {
+  desktopAuthToken = '';
+  desktopBootstrapPromise = null;
+
   if (process.env.ENTRANCE_AUTOSTART === '0') {
     return;
   }
@@ -663,6 +954,9 @@ function stopBackend() {
   if (!backendProcess || backendProcess.killed) {
     return;
   }
+
+  desktopAuthToken = '';
+  desktopBootstrapPromise = null;
 
   const target = backendProcess;
   backendProcess = null;
@@ -769,6 +1063,11 @@ async function loadEntranceWithStartupTransition(win) {
   });
   if (finishingShown && waitingPageVisible) {
     await wait(STARTUP_PROGRESS_TRANSITION_MS);
+  }
+
+  if (DESKTOP_API_ONLY) {
+    await ensureDesktopBootstrapSession();
+    return safeLoadURL(win, getRendererEntryUrl());
   }
 
   return safeLoadURL(win, ENTRANCE_URL);
@@ -1431,7 +1730,16 @@ function createMainWindow() {
 
 app.whenReady().then(() => {
   Menu.setApplicationMenu(null);
+  registerRendererProtocol();
+  configureDesktopAuthProxy();
   configureSerialPermissions();
+
+  if (DESKTOP_AUTH_PROXY_ENABLED && process.env.ENTRANCE_AUTOSTART === '0' && !EXPLICIT_BOOTSTRAP_SECRET) {
+    console.warn(
+      'ENTRANCE_AUTOSTART=0 with desktop API-only no-login mode requires an explicit ENTRANCE_DESKTOP_BOOTSTRAP_SECRET shared with the backend.'
+    );
+  }
+
   createMainWindow();
   startBackend();
 
