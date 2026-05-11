@@ -8,3 +8,6 @@
 
 # Common local runtime snapshots created during testing
 /Desktop/backend-data/
+
+# Local Codex workspace state
+/.codex
