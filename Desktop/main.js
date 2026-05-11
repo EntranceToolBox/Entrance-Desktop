@@ -5,7 +5,7 @@ const path = require('path');
 const { fork } = require('child_process');
 const { version: DESKTOP_APP_VERSION } = require('./package.json');
 
-const ENTRANCE_URL = process.env.ENTRANCE_URL || 'http://localhost:3000';
+const ENTRANCE_URL = process.env.ENTRANCE_URL || 'http://127.0.0.1:3000';
 const ENTRANCE_URL_OBJECT = new URL(ENTRANCE_URL);
 const ENTRANCE_ORIGIN = ENTRANCE_URL_OBJECT.origin;
 const ENTRANCE_API_BASE = ENTRANCE_URL_OBJECT.toString().replace(/\/$/, '');
