@@ -1,6 +1,6 @@
 {
   "name": "entrance-desktop",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "private": true,
   "description": "Electron shell locked to the local Entrance service.",
   "homepage": "https://github.com/EntranceToolBox/Entrance-Desktop",
@@ -17,10 +17,8 @@
     "start": "node launch-electron.js",
     "dev": "node launch-electron.js",
     "pack": "electron-builder --dir --publish never",
-    "dist": "electron-builder --publish never",
-    "dist:darwin": "electron-builder --mac zip --publish never",
-    "dist:linux": "electron-builder --linux AppImage --publish never",
-    "dist:win": "electron-builder --win portable --publish never"
+    "dist": "node package-app.js",
+    "dist:darwin": "node package-app.js"
   },
   "devDependencies": {
     "electron": "^28.3.3",
@@ -30,7 +28,7 @@
     "appId": "com.entrance.desktop",
     "productName": "Entrance Desktop",
     "directories": {
-      "output": "dist"
+      "output": "../../Desktop/dist"
     },
     "files": [
       "main.js",
@@ -41,11 +39,11 @@
     ],
     "extraResources": [
       {
-        "from": "../Share/Logo.png",
+        "from": "../../Share/Logo.png",
         "to": "Share/Logo.png"
       },
       {
-        "from": "../Entrance",
+        "from": "../../Entrance",
         "to": "Entrance",
         "filter": [
           "**/*",
@@ -69,38 +67,12 @@
         ]
       }
     ],
-    "linux": {
-      "target": [
-        "AppImage"
-      ],
-      "executableName": "entrance-desktop",
-      "icon": "../Share/Linux/icons",
-      "maintainer": "fcanlnony <fcanlnony@outlook.com>",
-      "category": "Utility",
-      "desktop": {
-        "Name": "Entrance Desktop",
-        "StartupWMClass": "Entrance Desktop"
-      }
-    },
     "mac": {
       "target": [
-        "zip"
+        "dir"
       ],
-      "icon": "../Share/MacOS/entrance-desktop.png",
+      "icon": "../../Share/MacOS/entrance-desktop.png",
       "category": "public.app-category.utilities"
-    },
-    "appImage": {
-      "executableArgs": [
-        "--no-sandbox"
-      ]
-    },
-    "afterPack": "./scripts/after-pack.js",
-    "win": {
-      "target": [
-        "portable"
-      ],
-      "icon": "../Share/Windows/entrance-desktop.ico",
-      "signAndEditExecutable": false
     }
   }
 }

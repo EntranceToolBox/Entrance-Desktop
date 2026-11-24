@@ -16,14 +16,14 @@ Electron shell for the Entrance backend.
 1. Install backend dependencies:
 
 ```bash
-cd ../Entrance
+cd Entrance
 npm install
 ```
 
 2. Install desktop dependencies:
 
 ```bash
-cd ../Desktop
+cd Platform/macOS
 npm install
 ```
 
@@ -43,25 +43,7 @@ Optional:
 - `ENTRANCE_DESKTOP_ALLOWED_ORIGIN` defaults to `app://entrance`.
 - `ENTRANCE_DESKTOP_BOOTSTRAP_SECRET` is auto-generated when Electron starts the backend itself. If `ENTRANCE_AUTOSTART=0` and desktop API-only no-login mode is still enabled, set the same explicit secret for both the wrapper and the backend.
 - `ENTRANCE_DESKTOP_VERSION` defaults to the desktop app's `package.json.version`; set it explicitly only if you need to override that value.
-- Linux auto-detects display backend:
-  - Wayland session (`WAYLAND_DISPLAY` or `XDG_SESSION_TYPE=wayland`) uses `ozone-platform=wayland`.
-  - Otherwise it falls back to `ozone-platform=x11`.
-  - Override via `ENTRANCE_OZONE_PLATFORM_HINT` (e.g. `x11`, `wayland`, `auto`).
 
 ## Package
 
-```bash
-# current platform
-npm run dist
-
-# linux
-npm run dist:linux
-
-# windows
-npm run dist:win
-
-# macOS
-npm run dist:mac
-```
-
-The Windows package target produces a single portable `.exe` rather than an installer.
+Run `npm run dist:darwin` from the repository root.

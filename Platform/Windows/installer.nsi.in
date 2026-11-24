@@ -1,0 +1,168 @@
+Unicode true
+!include "MUI2.nsh"
+!define PRODUCT "Entrance Desktop"
+!include "FileFunc.nsh"
+!define UNINSTALL_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\EntranceDesktop"
+
+Var PreviousRoot
+InstallDir "$LOCALAPPDATA\Programs\Entrance Desktop"
+InstallDirRegKey HKCU "${UNINSTALL_KEY}" "InstallLocation"
+Name "${PRODUCT}"
+OutFile "@CMAKE_CURRENT_BINARY_DIR@/@installer_name@"
+RequestExecutionLevel user
+SetCompressor /SOLID lzma
+VIProductVersion "@PROJECT_VERSION@.0"
+VIAddVersionKey "ProductName" "${PRODUCT}"
+VIAddVersionKey "FileDescription" "Entrance Desktop Setup"
+VIAddVersionKey "FileVersion" "@PROJECT_VERSION@"
+VIAddVersionKey "LegalCopyright" "Entrance Desktop contributors"
+
+!define MUI_ICON "@ROOT@/Share/Windows/entrance-desktop.ico"
+!define MUI_UNICON "@ROOT@/Share/Windows/entrance-desktop.ico"
+!insertmacro MUI_PAGE_WELCOME
+!define MUI_PAGE_CUSTOMFUNCTION_LEAVE VerifyDestination
+!insertmacro MUI_PAGE_DIRECTORY
+!insertmacro MUI_PAGE_INSTFILES
+!define MUI_FINISHPAGE_RUN "$INSTDIR\app\bin\entrance-desktop.exe"
+!insertmacro MUI_PAGE_FINISH
+!insertmacro MUI_UNPAGE_CONFIRM
+!insertmacro MUI_UNPAGE_INSTFILES
+!insertmacro MUI_LANGUAGE "English"
+!insertmacro MUI_LANGUAGE "SimpChinese"
+
+LangString CloseApp ${LANG_ENGLISH} "Close Entrance Desktop and try again."
+LangString CloseApp ${LANG_SIMPCHINESE} "请关闭 Entrance Desktop 后重试。"
+LangString InstallError ${LANG_ENGLISH} "Setup could not finish. Close Entrance Desktop and run Setup again."
+LangString InstallError ${LANG_SIMPCHINESE} "安装未完成，请关闭 Entrance Desktop 后重新运行安装程序。"
+
+LangString StageError ${LANG_ENGLISH} "Could not prepare the folder $INSTDIR\app.new. Check that you can write to this location."
+LangString StageError ${LANG_SIMPCHINESE} "无法创建或打开目录 $INSTDIR\app.new。请确认当前用户有写入权限。"
+LangString FolderConflict ${LANG_ENGLISH} "Choose a different folder. This location overlaps an existing installation or contains files Setup would replace."
+LangString FolderConflict ${LANG_SIMPCHINESE} "请选择其他目录。此位置与已有安装重叠，或包含安装程序会替换的文件。"
+
+!macro CheckClosed
+  FindWindow $0 "EntranceDesktop"
+  StrCmp $0 0 +3
+    MessageBox MB_OK|MB_ICONEXCLAMATION "$(CloseApp)" /SD IDOK
+    Abort
+!macroend
+
+Function .onInit
+  !insertmacro CheckClosed
+  ReadRegStr $PreviousRoot HKCU "${UNINSTALL_KEY}" "InstallLocation"
+FunctionEnd
+Function un.onInit
+  !insertmacro CheckClosed
+  ; NSIS initializes $INSTDIR to the directory containing Uninstall.exe (app).
+  IfFileExists "$INSTDIR\bin\entrance-desktop.exe" +2
+    Abort
+  ${GetParent} "$INSTDIR" $0
+  StrCpy $INSTDIR $0
+FunctionEnd
+
+; Normalize even a directory that Setup has not created yet. Keep the output
+; separate from the input so a failed lookup cannot clear the install root.
+!macro NormalizeRoot variable
+  StrCmp ${variable} "" conflict
+  ${GetRoot} "${variable}" $0
+  StrCmp $0 "" conflict
+  System::Call 'kernel32::GetFullPathNameW(w "${variable}", i ${NSIS_MAX_STRLEN}, w .r0, p 0) i.r1'
+  StrCmp $1 0 conflict
+  IntCmpU $1 ${NSIS_MAX_STRLEN} conflict +1 conflict
+  StrCpy ${variable} $0
+!macroend
+
+Function VerifyDestination
+  !insertmacro NormalizeRoot $INSTDIR
+  StrCmp $PreviousRoot "" checkFolders
+  !insertmacro NormalizeRoot $PreviousRoot
+  StrCmp $INSTDIR $PreviousRoot done
+  ; An upgrade to another folder must survive removal of the old app tree.
+  StrLen $0 "$PreviousRoot\"
+  StrCpy $1 "$INSTDIR\" $0
+  StrCmp $1 "$PreviousRoot\" conflict
+checkFolders:
+  IfFileExists "$INSTDIR\app" conflict
+  IfFileExists "$INSTDIR\app.new" conflict
+  IfFileExists "$INSTDIR\app.old" conflict done
+conflict:
+  MessageBox MB_OK|MB_ICONEXCLAMATION "$(FolderConflict)" /SD IDOK
+  Abort
+done:
+FunctionEnd
+
+Section "Entrance Desktop"
+  Call VerifyDestination
+  SetShellVarContext current
+  ; Keep the installed copy usable until the new payload is fully extracted.
+  ClearErrors
+  CreateDirectory "$INSTDIR"
+  IfErrors cannotStage
+  IfFileExists "$INSTDIR\app\*" stage
+  IfFileExists "$INSTDIR\app.old\*" 0 stage
+  Rename "$INSTDIR\app.old" "$INSTDIR\app"
+  IfErrors failed
+stage:
+  RMDir /r "$INSTDIR\app.new"
+  ClearErrors
+  SetOutPath "$INSTDIR\app.new"
+  IfErrors cannotStage
+  File /r "@payload@/*"
+  WriteUninstaller "$INSTDIR\app.new\Uninstall.exe"
+  SetOutPath "$INSTDIR"
+  IfErrors failed
+  RMDir /r "$INSTDIR\app.old"
+  IfFileExists "$INSTDIR\app\*" 0 publish
+  ClearErrors
+  Rename "$INSTDIR\app" "$INSTDIR\app.old"
+  IfErrors failed
+publish:
+  ClearErrors
+  Rename "$INSTDIR\app.new" "$INSTDIR\app"
+  IfErrors rollback
+
+  SetOutPath "$INSTDIR\app\bin"
+  CreateShortcut "$SMPROGRAMS\Entrance Desktop.lnk" "$INSTDIR\app\bin\entrance-desktop.exe"
+  WriteRegStr HKCU "${UNINSTALL_KEY}" "DisplayName" "${PRODUCT}"
+  WriteRegStr HKCU "${UNINSTALL_KEY}" "DisplayVersion" "@PROJECT_VERSION@"
+  WriteRegStr HKCU "${UNINSTALL_KEY}" "InstallLocation" "$INSTDIR"
+  WriteRegStr HKCU "${UNINSTALL_KEY}" "DisplayIcon" "$INSTDIR\app\bin\entrance-desktop.exe"
+  WriteRegStr HKCU "${UNINSTALL_KEY}" "UninstallString" '"$INSTDIR\app\Uninstall.exe"'
+  WriteRegDWORD HKCU "${UNINSTALL_KEY}" "NoModify" 1
+  WriteRegDWORD HKCU "${UNINSTALL_KEY}" "NoRepair" 1
+  IfErrors failed
+  RMDir /r "$INSTDIR\app.old"
+  StrCmp $PreviousRoot "" done
+  StrCmp $PreviousRoot $INSTDIR done
+  IfFileExists "$PreviousRoot\app\Uninstall.exe" 0 done
+  IfFileExists "$PreviousRoot\app\bin\entrance-desktop.exe" 0 done
+  RMDir /r "$PreviousRoot\app"
+  RMDir "$PreviousRoot"
+  Goto done
+cannotStage:
+  Abort "$(StageError)"
+rollback:
+  Rename "$INSTDIR\app.old" "$INSTDIR\app"
+failed:
+  SetOutPath "$TEMP"
+  RMDir /r "$INSTDIR\app.new"
+  Abort "$(InstallError)"
+done:
+SectionEnd
+
+Section "Uninstall"
+  SetShellVarContext current
+  SetOutPath "$TEMP"
+  ClearErrors
+  RMDir /r "$INSTDIR\app"
+  IfErrors 0 +2
+    Abort "$(CloseApp)"
+  RMDir /r "$INSTDIR\app.old"
+  RMDir /r "$INSTDIR\app.new"
+  RMDir "$INSTDIR"
+  ReadRegStr $0 HKCU "${UNINSTALL_KEY}" "InstallLocation"
+  StrCmp $0 $INSTDIR 0 finished
+  Delete "$SMPROGRAMS\Entrance Desktop.lnk"
+  DeleteRegKey HKCU "${UNINSTALL_KEY}"
+finished:
+SectionEnd

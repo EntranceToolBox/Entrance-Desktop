@@ -1,14 +1,15 @@
 {
   "name": "entrance-desktop-workspace",
+  "version": "0.1.7",
   "private": true,
   "scripts": {
-    "install:all": "npm install --prefix Entrance && npm install --prefix Desktop",
-    "start": "npm run start --prefix Desktop",
-    "dev": "npm run dev --prefix Desktop",
-    "pack": "npm run pack --prefix Desktop",
-    "dist": "npm run dist --prefix Desktop",
-    "dist:darwin": "npm run dist:darwin --prefix Desktop",
-    "dist:linux": "npm run dist:linux --prefix Desktop",
-    "dist:win": "npm run dist:win --prefix Desktop"
+    "install:all": "node Platform/build.js install:all",
+    "start": "node Platform/build.js start",
+    "dev": "node Platform/build.js dev",
+    "pack": "node Platform/build.js pack",
+    "dist": "node Platform/build.js dist",
+    "dist:darwin": "node Platform/build.js dist:darwin",
+    "dist:linux": "node Platform/build.js dist:linux",
+    "dist:win": "node Platform/build.js dist:win"
   }
 }

@@ -160,7 +160,7 @@ function getShareDirectory() {
   if (app.isPackaged) {
     return path.join(process.resourcesPath, 'Share');
   }
-  return path.resolve(__dirname, '..', 'Share');
+  return path.resolve(__dirname, '..', '..', 'Share');
 }
 
 function getStartupLogoPath() {
@@ -189,7 +189,7 @@ function getFrontendPublicDirectory() {
   if (app.isPackaged) {
     return path.join(process.resourcesPath, 'Entrance', 'public');
   }
-  return path.resolve(__dirname, '..', 'Entrance', 'public');
+  return path.resolve(__dirname, '..', '..', 'Entrance', 'public');
 }
 
 function getRendererContentType(filePath) {
@@ -757,7 +757,7 @@ function getBackendDirectory() {
   if (app.isPackaged) {
     return path.join(process.resourcesPath, 'Entrance');
   }
-  return path.resolve(__dirname, '..', 'Entrance');
+  return path.resolve(__dirname, '..', '..', 'Entrance');
 }
 
 function getBackendEntrypoint() {
@@ -940,6 +940,7 @@ function launchBackendWithFork() {
 }
 
 function startBackend() {
+  if (quitting || (backendProcess && backendProcess.exitCode === null && backendProcess.signalCode === null)) return;
   desktopAuthToken = '';
   desktopBootstrapPromise = null;
 
@@ -1687,6 +1688,7 @@ function createMainWindow() {
   win.once('ready-to-show', () => {
     if (!win.isDestroyed()) {
       win.show();
+      startBackend();
     }
   });
 
@@ -1741,7 +1743,6 @@ app.whenReady().then(() => {
   }
 
   createMainWindow();
-  startBackend();
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
