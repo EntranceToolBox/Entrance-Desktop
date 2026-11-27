@@ -19,30 +19,15 @@ if (data && !process.env.SSH_PASSWORD_KEY && fs.existsSync(path.join(data, 'user
     !fs.existsSync(path.join(data, '.ssh_password_key'))) {
   process.env.SSH_PASSWORD_KEY = '0123456789abcdef'.repeat(4);
 }
-// Manual login uses the signing key across restarts to restore saved sessions.
-function signingKey() {
-  if (process.env.AUTH_SECRET) return process.env.AUTH_SECRET;
-  const fresh = randomBytes(32).toString('hex');
-  if (process.env.ENTRANCE_DESKTOP_NOLOGIN !== '0') return fresh;
-  fs.mkdirSync(data, { recursive: true, mode: 0o700 });
-  const file = path.join(data, '.native_auth_key');
-  try {
-    fs.writeFileSync(file, fresh, { flag: 'wx', mode: 0o600 });
-    return fresh;
-  } catch (error) {
-    if (error.code !== 'EEXIST') throw error;
-    return fs.readFileSync(file, 'utf8').trim();
-  }
-}
 Object.assign(process.env, {
-  AUTH_SECRET: signingKey(),
+  AUTH_SECRET: process.env.AUTH_SECRET || randomBytes(32).toString('hex'),
   PORT: port,
   ENTRANCE_HOST: '127.0.0.1',
   ENTRANCE_DESKTOP_API_ONLY: '1',
+  ENTRANCE_DESKTOP_NOLOGIN: '1',
   ENTRANCE_DESKTOP_ALLOWED_ORIGIN: origin,
   ENTRANCE_DESKTOP_BOOTSTRAP_SECRET: secret,
-  ENTRANCE_DESKTOP_NOLOGIN: process.env.ENTRANCE_DESKTOP_NOLOGIN || '1',
-  ENTRANCE_DESKTOP_VERSION: process.env.ENTRANCE_DESKTOP_VERSION || '0.1.7'
+  ENTRANCE_DESKTOP_VERSION: process.env.ENTRANCE_DESKTOP_VERSION || '0.1.7-1'
 });
 console.log = console.error;
 const createServer = http.createServer;
@@ -72,8 +57,7 @@ http.createServer = function (app) {
     }
   });
   server.once('listening', () => {
-    const entry = process.env.ENTRANCE_DESKTOP_NOLOGIN === '1' ? ticket : '/index.html?desktopMode=1';
-    process.stdout.write(origin + entry + '\n');
+    process.stdout.write(origin + ticket + '\n');
   });
   return server;
 };

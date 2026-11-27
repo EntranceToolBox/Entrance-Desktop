@@ -39,7 +39,7 @@ Make the AppImage executable and run it directly. It includes the native client,
 
 To build the Windows x64 installer on Linux, install CMake, NSIS 3 (`makensis`) and the MinGW-w64 x86_64 C++ and resource compilers (`x86_64-w64-mingw32-g++` and `x86_64-w64-mingw32-windres`). Run `npm run dist:win`. The first build downloads the pinned WebView2 SDK, Windows Node.js and locked backend packages. The result is `Desktop/dist/Entrance-Desktop-Setup-<version>-Windows-x64.exe`. Run Setup once on Windows with the Evergreen WebView2 Runtime installed. Then launch Entrance Desktop from the Start menu. Setup defaults to `%LOCALAPPDATA%\Programs\Entrance Desktop`. You can browse to another writable folder. Upgrades default to the previous installation folder. Windows Settings lists the uninstaller.
 
-On Windows, install NSIS 3 and run `npm run dist` to create the installer in `Desktop/dist/`. On macOS the same command builds `Desktop/dist/Entrance Desktop.app`.
+On Windows, install NSIS 3 and run `npm run dist` to create the installer in `Desktop/dist/`. On macOS the same command creates `Entrance Desktop.app` and `Entrance Desktop.app.zip` in `Desktop/dist/`.
 
 The native app starts the bundled Entrance backend on loopback and closes it when the window exits. Set `PORT` to choose its port (default 3000). To open an already running web frontend, set `ENTRANCE_AUTOSTART=0` and `ENTRANCE_URL`.
 

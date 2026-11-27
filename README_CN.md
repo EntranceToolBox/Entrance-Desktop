@@ -41,6 +41,6 @@ npm start
 
 在 Linux 上交叉构建 Windows x64 版本，需要 CMake、NSIS 3（`makensis`）和 MinGW-w64 的 `x86_64-w64-mingw32-g++`、`x86_64-w64-mingw32-windres`。运行 `npm run dist:win`，首次构建会下载固定版本的 WebView2 SDK、Windows 版 Node.js 和锁定的后端依赖。产物为 `Desktop/dist/Entrance-Desktop-Setup-<版本>-Windows-x64.exe`。在装有 Evergreen WebView2 Runtime 的 Windows 上运行一次安装程序，此后从开始菜单打开 Entrance Desktop。安装向导默认选择 `%LOCALAPPDATA%\Programs\Entrance Desktop`，可以浏览选择其他可写目录；升级时默认使用上次的安装位置。安装后可在 Windows 设置的“已安装的应用”中卸载。
 
-在 Windows 上安装 NSIS 3 后运行 `npm run dist`，可在 `Desktop/dist/` 生成同样的安装程序。在 macOS 上运行同一命令会生成 `Desktop/dist/Entrance Desktop.app`。
+在 Windows 上安装 NSIS 3 后运行 `npm run dist`，可在 `Desktop/dist/` 生成同样的安装程序。在 macOS 上运行同一命令会在 `Desktop/dist/` 下生成 `Entrance Desktop.app` 和 `Entrance Desktop.app.zip`。
 
 感谢测试: [makabaka2240](https://github.com/makabaka2240)

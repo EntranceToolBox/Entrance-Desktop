@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
-project(EntranceDesktop VERSION 0.1.7 LANGUAGES CXX)
+project(EntranceDesktop VERSION 0.1.7.1 LANGUAGES CXX)
+set(DESKTOP_VERSION "${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}.${PROJECT_VERSION_PATCH}-${PROJECT_VERSION_TWEAK}")
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -68,7 +69,7 @@ if(WIN32)
     set(nsis_env "NSISDIR=${nsis_root}")
   endif()
   set(payload "${CMAKE_CURRENT_BINARY_DIR}/installer-payload")
-  set(installer_name "Entrance-Desktop-Setup-${PROJECT_VERSION}-Windows-${arch}.exe")
+  set(installer_name "Entrance-Desktop-Setup-${DESKTOP_VERSION}-Windows-${arch}.exe")
   configure_file(Windows/installer.nsi.in installer.nsi @ONLY)
   add_custom_target(installer
     COMMAND "${CMAKE_COMMAND}" -E rm -rf "${payload}"
@@ -87,7 +88,7 @@ else()
   install(FILES "${ROOT}/Share/Linux/entrance-desktop.png" DESTINATION share/icons/hicolor/512x512/apps)
   add_custom_target(appimage
     COMMAND bash "${CMAKE_CURRENT_SOURCE_DIR}/Linux/appimage.sh"
-      "${CMAKE_BINARY_DIR}" "${DIST_DIR}" "${PROJECT_VERSION}" "${NODE_EXECUTABLE}"
+      "${CMAKE_BINARY_DIR}" "${DIST_DIR}" "${DESKTOP_VERSION}" "${NODE_EXECUTABLE}"
     DEPENDS entrance-desktop
     USES_TERMINAL VERBATIM)
 endif()

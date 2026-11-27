@@ -11,10 +11,10 @@ Name "${PRODUCT}"
 OutFile "@CMAKE_CURRENT_BINARY_DIR@/@installer_name@"
 RequestExecutionLevel user
 SetCompressor /SOLID lzma
-VIProductVersion "@PROJECT_VERSION@.0"
+VIProductVersion "@PROJECT_VERSION@"
 VIAddVersionKey "ProductName" "${PRODUCT}"
 VIAddVersionKey "FileDescription" "Entrance Desktop Setup"
-VIAddVersionKey "FileVersion" "@PROJECT_VERSION@"
+VIAddVersionKey "FileVersion" "@DESKTOP_VERSION@"
 VIAddVersionKey "LegalCopyright" "Entrance Desktop contributors"
 
 !define MUI_ICON "@ROOT@/Share/Windows/entrance-desktop.ico"
@@ -124,7 +124,7 @@ publish:
   SetOutPath "$INSTDIR\app\bin"
   CreateShortcut "$SMPROGRAMS\Entrance Desktop.lnk" "$INSTDIR\app\bin\entrance-desktop.exe"
   WriteRegStr HKCU "${UNINSTALL_KEY}" "DisplayName" "${PRODUCT}"
-  WriteRegStr HKCU "${UNINSTALL_KEY}" "DisplayVersion" "@PROJECT_VERSION@"
+  WriteRegStr HKCU "${UNINSTALL_KEY}" "DisplayVersion" "@DESKTOP_VERSION@"
   WriteRegStr HKCU "${UNINSTALL_KEY}" "InstallLocation" "$INSTDIR"
   WriteRegStr HKCU "${UNINSTALL_KEY}" "DisplayIcon" "$INSTDIR\app\bin\entrance-desktop.exe"
   WriteRegStr HKCU "${UNINSTALL_KEY}" "UninstallString" '"$INSTDIR\app\Uninstall.exe"'

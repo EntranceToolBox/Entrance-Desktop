@@ -57,12 +57,10 @@ function resolveDesktopRendererOrigin(rawOrigin) {
 }
 
 const DESKTOP_API_ONLY = parseDesktopFlag('ENTRANCE_DESKTOP_API_ONLY', true);
-const DESKTOP_NOLOGIN = parseDesktopFlag('ENTRANCE_DESKTOP_NOLOGIN', true);
 const DESKTOP_RENDERER = resolveDesktopRendererOrigin(process.env.ENTRANCE_DESKTOP_ALLOWED_ORIGIN);
 const DESKTOP_ALLOWED_ORIGIN = DESKTOP_RENDERER.origin;
 const EXPLICIT_BOOTSTRAP_SECRET = String(process.env.ENTRANCE_DESKTOP_BOOTSTRAP_SECRET || '').trim();
 const DESKTOP_BOOTSTRAP_SECRET = EXPLICIT_BOOTSTRAP_SECRET || crypto.randomBytes(32).toString('hex');
-const DESKTOP_AUTH_PROXY_ENABLED = DESKTOP_API_ONLY && DESKTOP_NOLOGIN;
 
 protocol.registerSchemesAsPrivileged([
   {
@@ -773,7 +771,7 @@ function getRendererEntryUrl() {
   entryUrl.searchParams.set('apiBase', ENTRANCE_API_BASE);
   entryUrl.searchParams.set('wsBase', ENTRANCE_WS_BASE);
   entryUrl.searchParams.set('desktopMode', '1');
-  if (DESKTOP_AUTH_PROXY_ENABLED) {
+  if (DESKTOP_API_ONLY) {
     entryUrl.searchParams.set('authProxy', 'header');
   }
   return entryUrl.toString();
@@ -797,7 +795,7 @@ function getBackendAllowedHosts() {
 }
 
 function shouldAttachDesktopAuth(url) {
-  if (!DESKTOP_AUTH_PROXY_ENABLED || !desktopAuthToken) {
+  if (!DESKTOP_API_ONLY || !desktopAuthToken) {
     return false;
   }
 
@@ -811,7 +809,7 @@ function shouldAttachDesktopAuth(url) {
 }
 
 async function ensureDesktopBootstrapSession() {
-  if (!DESKTOP_AUTH_PROXY_ENABLED) {
+  if (!DESKTOP_API_ONLY) {
     desktopAuthToken = '';
     return '';
   }
@@ -892,7 +890,7 @@ function getBackendEnv() {
     ENTRANCE_DESKTOP_API_ONLY: DESKTOP_API_ONLY ? '1' : '0',
     ENTRANCE_DESKTOP_ALLOWED_ORIGIN: DESKTOP_ALLOWED_ORIGIN,
     ENTRANCE_DESKTOP_BOOTSTRAP_SECRET: DESKTOP_BOOTSTRAP_SECRET,
-    ENTRANCE_DESKTOP_NOLOGIN: DESKTOP_NOLOGIN ? '1' : '0',
+    ENTRANCE_DESKTOP_NOLOGIN: '1',
     ENTRANCE_DATA_DIR: dataDir
   };
 }
@@ -1736,7 +1734,7 @@ app.whenReady().then(() => {
   configureDesktopAuthProxy();
   configureSerialPermissions();
 
-  if (DESKTOP_AUTH_PROXY_ENABLED && process.env.ENTRANCE_AUTOSTART === '0' && !EXPLICIT_BOOTSTRAP_SECRET) {
+  if (DESKTOP_API_ONLY && process.env.ENTRANCE_AUTOSTART === '0' && !EXPLICIT_BOOTSTRAP_SECRET) {
     console.warn(
       'ENTRANCE_AUTOSTART=0 with desktop API-only no-login mode requires an explicit ENTRANCE_DESKTOP_BOOTSTRAP_SECRET shared with the backend.'
     );
