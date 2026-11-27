@@ -13,5 +13,3 @@
 /.codex
 /Platform/build/
 /Platform/dist/
-/Platform/macOS/node_modules/
-/Platform/macOS/dist/

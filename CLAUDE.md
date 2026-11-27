@@ -8,9 +8,9 @@
 
 ## Startup Model
 - Root `npm start` dispatches to the host platform via `Platform/build.js`.
-- macOS uses Electron with `Platform/macOS/main.js`, which forks `Entrance/server.js`.
+- macOS uses Swift, AppKit and WKWebView with `Platform/macOS/main.swift`.
 - Linux uses GTK4, libadwaita and WebKitGTK. Windows uses Win32 and WebView2.
-- The native C++17 clients start Node.js with `Platform/backend.cjs`, which loads the Entrance backend, and wait for its startup URL on a private pipe.
+- The native clients start Node.js with `Platform/backend.cjs`, which loads the Entrance backend, and wait for its startup URL on a private pipe.
 - `Entrance/start.sh` is for running the backend submodule independently.
 
 ## Collaboration Preference

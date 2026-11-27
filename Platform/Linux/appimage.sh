@@ -44,13 +44,7 @@ image="Entrance-Desktop-$version-$arch.AppImage"
 if command -v appimagetool >/dev/null && [[ -z ${APPIMAGE_RUNTIME:-} ]]; then
     ARCH="$arch" VERSION="$version" appimagetool "$appdir" "$work/$image"
 else
-    # Reuse the Type 2 runtime from earlier electron-builder builds if present.
-    case "$arch" in
-        x86_64) suffix=x64 ;; aarch64) suffix=arm64 ;; armv7l) suffix=armv7l ;;
-        i?86) suffix=ia32 ;; *) suffix="$arch" ;;
-    esac
-    cache=${ELECTRON_BUILDER_CACHE:-${XDG_CACHE_HOME:-$HOME/.cache}/electron-builder}
-    runtime=${APPIMAGE_RUNTIME:-$cache/appimage/appimage-12.0.1/runtime-$suffix}
+    runtime=${APPIMAGE_RUNTIME:-$build/appimage/runtime-$arch}
     if [[ ! -r "$runtime" ]]; then
         echo 'Install appimagetool or set APPIMAGE_RUNTIME to a matching Type 2 runtime and install squashfs-tools.' >&2
         exit 1

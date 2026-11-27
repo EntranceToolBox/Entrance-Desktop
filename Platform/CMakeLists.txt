@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
-project(EntranceDesktop VERSION 0.1.7.1 LANGUAGES CXX)
-set(DESKTOP_VERSION "${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}.${PROJECT_VERSION_PATCH}-${PROJECT_VERSION_TWEAK}")
+project(EntranceDesktop VERSION 0.1.8 LANGUAGES CXX)
+set(DESKTOP_VERSION "${PROJECT_VERSION}")
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -57,8 +57,7 @@ if(WIN32)
   endif()
   install(PROGRAMS "${NODE_EXECUTABLE}" DESTINATION bin RENAME node.exe)
   find_program(MAKENSIS makensis
-    PATHS "$ENV{ProgramFiles}/NSIS" "$ENV{ProgramFiles\(x86\)}/NSIS" "$ENV{ELECTRON_BUILDER_CACHE}/nsis/nsis-3.0.4.1/linux"
-          "$ENV{HOME}/.cache/electron-builder/nsis/nsis-3.0.4.1/linux"
+    PATHS "$ENV{ProgramFiles}/NSIS" "$ENV{ProgramFiles\(x86\)}/NSIS"
     NO_CMAKE_FIND_ROOT_PATH)
   if(NOT MAKENSIS)
     set(MAKENSIS makensis) # Only packaging requires NSIS on PATH.

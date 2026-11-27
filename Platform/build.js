@@ -18,9 +18,8 @@ function npm(args) {
 }
 if (command === 'install:all') {
   npm(['install', '--prefix', 'Entrance']);
-  if (platform === 'darwin') npm(['install', '--prefix', 'Platform/macOS']);
 } else if (platform === 'darwin') {
-  npm(['--prefix', 'Platform/macOS', 'run', command]);
+  run(process.execPath, [path.join(__dirname, 'macOS/build.js'), command]);
 } else {
   if (!crossWindows && platform !== process.platform) throw Error('Build the native package on its target OS.');
   const configure = ['-S', 'Platform', '-B', build, '-DCMAKE_BUILD_TYPE=Release', '-DNODE_EXECUTABLE=' + process.execPath];

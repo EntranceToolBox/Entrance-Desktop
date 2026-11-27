@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleIdentifier</key><string>com.entrance.desktop</string>
+    <key>CFBundleName</key><string>Entrance Desktop</string>
+    <key>CFBundleExecutable</key><string>Entrance Desktop</string>
+    <key>CFBundleIconFile</key><string>entrance-desktop.icns</string>
+    <key>CFBundlePackageType</key><string>APPL</string>
+    <key>CFBundleInfoDictionaryVersion</key><string>6.0</string>
+    <key>CFBundleShortVersionString</key><string>@RELEASE@</string>
+    <key>CFBundleVersion</key><string>@RELEASE@</string>
+    <key>EntranceDesktopVersion</key><string>@VERSION@</string>
+    <key>LSMinimumSystemVersion</key><string>@MINIMUM@</string>
+    <key>LSApplicationCategoryType</key><string>public.app-category.utilities</string>
+    <key>NSHighResolutionCapable</key><true/>
+    <key>NSAppTransportSecurity</key>
+    <dict>
+        <key>NSAllowsLocalNetworking</key><true/>
+        <key>NSExceptionDomains</key>
+        <dict>
+            <key>127.0.0.1</key>
+            <dict><key>NSExceptionAllowsInsecureHTTPLoads</key><true/></dict>
+        </dict>
+    </dict>
+    <key>NSPrincipalClass</key><string>NSApplication</string>
+</dict>
+</plist>

@@ -11,7 +11,7 @@ const port = process.env.PORT || new URL(process.env.ENTRANCE_URL || 'http://127
 const origin = 'http://127.0.0.1:' + port;
 const secret = randomBytes(32).toString('hex');
 let ticket = '/' + randomBytes(32).toString('hex');
-// Electron releases used this SSH key when the user supplied no override.
+// Earlier desktop releases used this SSH key when the user supplied no override.
 // Existing encrypted saved hosts still need it. Fresh profiles use the
 // backend's per-user generated key file.
 const data = process.env.ENTRANCE_DATA_DIR;
@@ -27,7 +27,7 @@ Object.assign(process.env, {
   ENTRANCE_DESKTOP_NOLOGIN: '1',
   ENTRANCE_DESKTOP_ALLOWED_ORIGIN: origin,
   ENTRANCE_DESKTOP_BOOTSTRAP_SECRET: secret,
-  ENTRANCE_DESKTOP_VERSION: process.env.ENTRANCE_DESKTOP_VERSION || '0.1.7-1'
+  ENTRANCE_DESKTOP_VERSION: process.env.ENTRANCE_DESKTOP_VERSION || '0.1.8'
 });
 console.log = console.error;
 const createServer = http.createServer;
@@ -62,3 +62,9 @@ http.createServer = function (app) {
   return server;
 };
 require(serverFile);
+
+// The macOS launcher owns the write end. EOF also covers a crashed window process.
+if (process.argv[3] === '--parent-pipe') {
+  process.stdin.on('end', () => process.kill(process.pid, 'SIGTERM'));
+  process.stdin.resume();
+}

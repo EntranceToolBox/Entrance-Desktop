@@ -1,6 +1,6 @@
 {
   "name": "entrance-desktop-workspace",
-  "version": "0.1.7-1",
+  "version": "0.1.8",
   "private": true,
   "scripts": {
     "install:all": "node Platform/build.js install:all",

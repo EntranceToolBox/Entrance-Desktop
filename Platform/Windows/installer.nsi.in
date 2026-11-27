@@ -11,7 +11,7 @@ Name "${PRODUCT}"
 OutFile "@CMAKE_CURRENT_BINARY_DIR@/@installer_name@"
 RequestExecutionLevel user
 SetCompressor /SOLID lzma
-VIProductVersion "@PROJECT_VERSION@"
+VIProductVersion "@PROJECT_VERSION@.0"
 VIAddVersionKey "ProductName" "${PRODUCT}"
 VIAddVersionKey "FileDescription" "Entrance Desktop Setup"
 VIAddVersionKey "FileVersion" "@DESKTOP_VERSION@"
